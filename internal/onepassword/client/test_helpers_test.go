@@ -39,7 +39,11 @@ func loadDotEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open .env: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			t.Fatalf("failed to close .env: %v", closeErr)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -97,24 +101,18 @@ func newTestClient(t *testing.T) *ClientWrapper {
 
 	loadDotEnv(t)
 
-	if token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN"); token != "" {
-		client, err := NewServiceAccount(context.Background(), "test", token)
-		if err != nil {
-			t.Fatalf("failed to create service account client: %v", err)
-		}
-		return client
+	token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
+	if token == "" {
+		t.Skip("set OP_SERVICE_ACCOUNT_TOKEN in .env to run service account tests")
+		return nil
 	}
 
-	if account := os.Getenv("OP_ACCOUNT_NAME"); account != "" {
-		client, err := NewDesktopAppIntegration(context.Background(), "test", account)
-		if err != nil {
-			t.Fatalf("failed to create desktop app client: %v", err)
-		}
-		return client
+	client, err := NewServiceAccount(context.Background(), "test", token)
+	if err != nil {
+		t.Fatalf("failed to create service account client: %v", err)
 	}
 
-	t.Skip("set OP_SERVICE_ACCOUNT_TOKEN or OP_ACCOUNT_NAME in .env to run integration tests")
-	return nil
+	return client
 }
 
 func getEnvOrSkip(t *testing.T, key string) string {
