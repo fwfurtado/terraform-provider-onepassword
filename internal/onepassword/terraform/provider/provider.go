@@ -189,10 +189,7 @@ func (p *OnePasswordProvider) EphemeralResources(context.Context) []func() ephem
 			return &OnePasswordEphemeralItem{}
 		},
 		func() ephemeral.EphemeralResource {
-			return &OnePasswordEphemeralVault{}
-		},
-		func() ephemeral.EphemeralResource {
-			return &OnePasswordEphemeralItemOverview{}
+			return &OnePasswordEphemeralPassword{}
 		},
 	}
 }
@@ -202,7 +199,11 @@ func (p *OnePasswordProvider) DataSources(context.Context) []func() datasource.D
 }
 
 func (p *OnePasswordProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		func() resource.Resource {
+			return &OnePasswordResourceItem{}
+		},
+	}
 }
 
 var (
