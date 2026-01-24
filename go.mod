@@ -3,11 +3,13 @@ module github.com/fwfurtado/onepassword-tf-provider
 go 1.25.5
 
 require (
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/samber/lo v1.52.0
+	github.com/stretchr/testify v1.11.1
+	golang.org/x/crypto v0.47.0
 )
 
 require (
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/hashicorp/go-plugin v1.7.0 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
@@ -15,9 +17,11 @@ require (
 	github.com/hashicorp/terraform-svchost v0.1.1 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/oklog/run v1.1.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	golang.org/x/net v0.48.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/grpc v1.75.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (
@@ -43,7 +47,7 @@ require (
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 )

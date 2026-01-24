@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     onepassword = {
-      source  = "registry.terraform.io/fwfurtado/onepassword"
+      source = "registry.terraform.io/fwfurtado/onepassword"
     }
   }
 }
