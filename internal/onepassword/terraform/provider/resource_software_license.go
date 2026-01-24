@@ -64,88 +64,85 @@ func (r *OnePasswordSoftwareLicense) Metadata(_ context.Context, req resource.Me
 // Schema defines the schema for software license items.
 func (r *OnePasswordSoftwareLicense) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	attributes := sharedItemAttributes()
-	attributes["software"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Software details.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"version": schema.StringAttribute{
-				MarkdownDescription: "Software version.",
-				Optional:            true,
-			},
-			"license_key": schema.StringAttribute{
-				MarkdownDescription: "License key.",
-				Optional:            true,
-				Sensitive:           true,
-				WriteOnly:           true,
-			},
-		},
-	}
-	attributes["customer"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Customer details.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"licensed_to": schema.StringAttribute{
-				MarkdownDescription: "Licensed to.",
-				Optional:            true,
-			},
-			"registered_email": schema.StringAttribute{
-				MarkdownDescription: "Registered email.",
-				Optional:            true,
-			},
-			"company": schema.StringAttribute{
-				MarkdownDescription: "Company name.",
-				Optional:            true,
-			},
-		},
-	}
-	attributes["publisher"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Publisher details.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				MarkdownDescription: "Publisher name.",
-				Optional:            true,
-			},
-			"donwload_page": schema.StringAttribute{
-				MarkdownDescription: "Download page URL.",
-				Optional:            true,
-			},
-			"website": schema.StringAttribute{
-				MarkdownDescription: "Publisher website.",
-				Optional:            true,
-			},
-			"retail_price": schema.NumberAttribute{
-				MarkdownDescription: "Retail price.",
-				Optional:            true,
-			},
-			"support_email": schema.StringAttribute{
-				MarkdownDescription: "Support email.",
-				Optional:            true,
-			},
-		},
-	}
-	attributes["order"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Order details.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"number": schema.StringAttribute{
-				MarkdownDescription: "Order number.",
-				Optional:            true,
-			},
-			"total": schema.NumberAttribute{
-				MarkdownDescription: "Order total.",
-				Optional:            true,
-			},
-			"purchase_date": schema.StringAttribute{
-				MarkdownDescription: "Purchase date.",
-				Optional:            true,
-			},
-		},
-	}
-
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password software license items.",
 		Attributes:          attributes,
+		Blocks: map[string]schema.Block{
+			"software": schema.SingleNestedBlock{
+				MarkdownDescription: "Software details.",
+				Attributes: map[string]schema.Attribute{
+					"version": schema.StringAttribute{
+						MarkdownDescription: "Software version.",
+						Optional:            true,
+					},
+					"license_key": schema.StringAttribute{
+						MarkdownDescription: "License key.",
+						Optional:            true,
+						Sensitive:           true,
+						WriteOnly:           true,
+					},
+				},
+			},
+			"customer": schema.SingleNestedBlock{
+				MarkdownDescription: "Customer details.",
+				Attributes: map[string]schema.Attribute{
+					"licensed_to": schema.StringAttribute{
+						MarkdownDescription: "Licensed to.",
+						Optional:            true,
+					},
+					"registered_email": schema.StringAttribute{
+						MarkdownDescription: "Registered email.",
+						Optional:            true,
+					},
+					"company": schema.StringAttribute{
+						MarkdownDescription: "Company name.",
+						Optional:            true,
+					},
+				},
+			},
+			"publisher": schema.SingleNestedBlock{
+				MarkdownDescription: "Publisher details.",
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Publisher name.",
+						Optional:            true,
+					},
+					"donwload_page": schema.StringAttribute{
+						MarkdownDescription: "Download page URL.",
+						Optional:            true,
+					},
+					"website": schema.StringAttribute{
+						MarkdownDescription: "Publisher website.",
+						Optional:            true,
+					},
+					"retail_price": schema.NumberAttribute{
+						MarkdownDescription: "Retail price.",
+						Optional:            true,
+					},
+					"support_email": schema.StringAttribute{
+						MarkdownDescription: "Support email.",
+						Optional:            true,
+					},
+				},
+			},
+			"order": schema.SingleNestedBlock{
+				MarkdownDescription: "Order details.",
+				Attributes: map[string]schema.Attribute{
+					"number": schema.StringAttribute{
+						MarkdownDescription: "Order number.",
+						Optional:            true,
+					},
+					"total": schema.NumberAttribute{
+						MarkdownDescription: "Order total.",
+						Optional:            true,
+					},
+					"purchase_date": schema.StringAttribute{
+						MarkdownDescription: "Purchase date.",
+						Optional:            true,
+					},
+				},
+			},
+		},
 	}
 }
 
