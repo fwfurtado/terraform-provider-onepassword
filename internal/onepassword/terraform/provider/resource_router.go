@@ -11,14 +11,14 @@ import (
 
 // OnePasswordRouterBaseStationModel holds base station credentials.
 type OnePasswordRouterBaseStationModel struct {
-	Name     types.String `tfsdk:"name"`
-	Password types.String `tfsdk:"password"`
+	Name     types.String                   `tfsdk:"name"`
+	Password OnePasswordSharedPasswordModel `tfsdk:"password"`
 }
 
 // OnePasswordRouterWirelessModel holds wireless settings.
 type OnePasswordRouterWirelessModel struct {
-	SecurityType types.String `tfsdk:"security_type"`
-	Passphrase   types.String `tfsdk:"passphrase"`
+	SecurityType types.String                   `tfsdk:"security_type"`
+	Passphrase   OnePasswordSharedPasswordModel `tfsdk:"passphrase"`
 }
 
 // OnePasswordRouterModel represents router items.
@@ -27,7 +27,7 @@ type OnePasswordRouterModel struct {
 	ServerIP                types.String                       `tfsdk:"server_ip"`
 	AirportID               types.String                       `tfsdk:"airport_id"`
 	NetworkName             types.String                       `tfsdk:"network_name"`
-	AttachedStoragePassword types.String                       `tfsdk:"attached_storage_password"`
+	AttachedStoragePassword OnePasswordSharedPasswordModel     `tfsdk:"attached_storage_password"`
 	BaseStation             *OnePasswordRouterBaseStationModel `tfsdk:"base_station"`
 	Wireless                *OnePasswordRouterWirelessModel    `tfsdk:"wireless"`
 }
@@ -61,48 +61,37 @@ func (r *OnePasswordRouter) Schema(_ context.Context, _ resource.SchemaRequest, 
 		MarkdownDescription: "Network name.",
 		Optional:            true,
 	}
-	attributes["attached_storage_password"] = schema.StringAttribute{
-		MarkdownDescription: "Attached storage password.",
-		Optional:            true,
-		Sensitive:           true,
-		WriteOnly:           true,
-	}
-	attributes["base_station"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Base station credentials.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				MarkdownDescription: "Base station name.",
-				Optional:            true,
-			},
-			"password": schema.StringAttribute{
-				MarkdownDescription: "Base station password.",
-				Optional:            true,
-				Sensitive:           true,
-				WriteOnly:           true,
-			},
-		},
-	}
-	attributes["wireless"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Wireless settings.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"security_type": schema.StringAttribute{
-				MarkdownDescription: "Wireless security type.",
-				Optional:            true,
-			},
-			"passphrase": schema.StringAttribute{
-				MarkdownDescription: "Wireless passphrase.",
-				Optional:            true,
-				Sensitive:           true,
-				WriteOnly:           true,
-			},
-		},
-	}
 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password router items.",
 		Attributes:          attributes,
+		Blocks: map[string]schema.Block{
+			"attached_storage_password": passwordBlockSchema("Attached storage password recipe."),
+			"base_station": schema.SingleNestedBlock{
+				MarkdownDescription: "Base station credentials.",
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Base station name.",
+						Optional:            true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"password": passwordBlockSchema("Base station password recipe."),
+				},
+			},
+			"wireless": schema.SingleNestedBlock{
+				MarkdownDescription: "Wireless settings.",
+				Attributes: map[string]schema.Attribute{
+					"security_type": schema.StringAttribute{
+						MarkdownDescription: "Wireless security type.",
+						Optional:            true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"passphrase": passwordBlockSchema("Wireless passphrase recipe."),
+				},
+			},
+		},
 	}
 }
 
@@ -120,18 +109,34 @@ func (r *OnePasswordRouter) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	attachedStoragePassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.AttachedStoragePassword, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate attached storage password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "server_ip", onepassword.ItemFieldTypeText, plan.ServerIP)
 	addStringField(&inputs, "airport_id", onepassword.ItemFieldTypeText, plan.AirportID)
 	addStringField(&inputs, "network_name", onepassword.ItemFieldTypeText, plan.NetworkName)
-	addStringField(&inputs, "attached_storage_password", onepassword.ItemFieldTypeConcealed, plan.AttachedStoragePassword)
+	addConcealedField(&inputs, "attached_storage_password", types.StringValue(attachedStoragePassword))
 	if plan.BaseStation != nil {
+		baseStationPassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.BaseStation.Password, true)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to generate base station password", err.Error())
+			return
+		}
 		addStringField(&inputs, "base_station_name", onepassword.ItemFieldTypeText, plan.BaseStation.Name)
-		addStringField(&inputs, "base_station_password", onepassword.ItemFieldTypeConcealed, plan.BaseStation.Password)
+		addConcealedField(&inputs, "base_station_password", types.StringValue(baseStationPassword))
 	}
 	if plan.Wireless != nil {
+		wirelessPassphrase, _, err := generatePasswordFromShared(ctx, r.client, &plan.Wireless.Passphrase, true)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to generate wireless passphrase", err.Error())
+			return
+		}
 		addStringField(&inputs, "wireless_security_type", onepassword.ItemFieldTypeText, plan.Wireless.SecurityType)
-		addStringField(&inputs, "wireless_passphrase", onepassword.ItemFieldTypeConcealed, plan.Wireless.Passphrase)
+		addConcealedField(&inputs, "wireless_passphrase", types.StringValue(wirelessPassphrase))
 	}
 	extraFields := buildFieldsFromInputs(inputs, nil)
 
@@ -205,18 +210,34 @@ func (r *OnePasswordRouter) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	attachedStoragePassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.AttachedStoragePassword, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate attached storage password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "server_ip", onepassword.ItemFieldTypeText, plan.ServerIP)
 	addStringField(&inputs, "airport_id", onepassword.ItemFieldTypeText, plan.AirportID)
 	addStringField(&inputs, "network_name", onepassword.ItemFieldTypeText, plan.NetworkName)
-	addStringField(&inputs, "attached_storage_password", onepassword.ItemFieldTypeConcealed, plan.AttachedStoragePassword)
+	addConcealedField(&inputs, "attached_storage_password", types.StringValue(attachedStoragePassword))
 	if plan.BaseStation != nil {
+		baseStationPassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.BaseStation.Password, true)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to generate base station password", err.Error())
+			return
+		}
 		addStringField(&inputs, "base_station_name", onepassword.ItemFieldTypeText, plan.BaseStation.Name)
-		addStringField(&inputs, "base_station_password", onepassword.ItemFieldTypeConcealed, plan.BaseStation.Password)
+		addConcealedField(&inputs, "base_station_password", types.StringValue(baseStationPassword))
 	}
 	if plan.Wireless != nil {
+		wirelessPassphrase, _, err := generatePasswordFromShared(ctx, r.client, &plan.Wireless.Passphrase, true)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to generate wireless passphrase", err.Error())
+			return
+		}
 		addStringField(&inputs, "wireless_security_type", onepassword.ItemFieldTypeText, plan.Wireless.SecurityType)
-		addStringField(&inputs, "wireless_passphrase", onepassword.ItemFieldTypeConcealed, plan.Wireless.Passphrase)
+		addConcealedField(&inputs, "wireless_passphrase", types.StringValue(wirelessPassphrase))
 	}
 	extraFields := buildFieldsFromInputs(inputs, existing)
 
