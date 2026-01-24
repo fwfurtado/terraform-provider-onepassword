@@ -3,10 +3,8 @@ package onepasswordprovider
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	"github.com/fwfurtado/onepassword-tf-provider/internal/onepassword/client"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
@@ -15,11 +13,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+// OnePasswordEphemeralSecretModel holds the secret reference and resolved value.
 type OnePasswordEphemeralSecretModel struct {
 	reference types.String `tfsdk:"reference"`
 	Value     types.String `tfsdk:"value"`
 }
 
+// OnePasswordEphemeralSecret resolves a secret reference at apply time.
 type OnePasswordEphemeralSecret struct {
 	client *client.ClientWrapper
 }
@@ -28,6 +28,7 @@ var (
 	_ ephemeral.EphemeralResourceWithConfigure = &OnePasswordEphemeralSecret{}
 )
 
+// Configure stores the configured 1Password client.
 func (r *OnePasswordEphemeralSecret) Configure(ctx context.Context, req ephemeral.ConfigureRequest, resp *ephemeral.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -54,23 +55,37 @@ func (r *OnePasswordEphemeralSecret) Configure(ctx context.Context, req ephemera
 	r.client = client
 }
 
+// Metadata sets the ephemeral resource type name.
 func (r *OnePasswordEphemeralSecret) Metadata(ctx context.Context, req ephemeral.MetadataRequest, resp *ephemeral.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_secret"
 }
 
+// Schema defines the schema for the onepassword_secret ephemeral resource.
 func (r *OnePasswordEphemeralSecret) Schema(ctx context.Context, req ephemeral.SchemaRequest, resp *ephemeral.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Get a secret from 1Password",
+		MarkdownDescription: "Get a secret from 1Password.\n\n" +
+			"Example:\n" +
+			"```hcl\n" +
+			"ephemeral \"onepassword_secret\" \"db_password\" {\n" +
+			"  reference = \"op://Engineering/Database/password\"\n" +
+			"}\n" +
+			"\n" +
+			"output \"db_password\" {\n" +
+			"  value     = ephemeral.onepassword_secret.db_password.value\n" +
+			"  sensitive = true\n" +
+			"}\n" +
+			"```\n\n" +
+			"Reference: https://developer.1password.com/docs/cli/secret-reference-syntax/",
 		Attributes: map[string]schema.Attribute{
 			"reference": schema.StringAttribute{
-				MarkdownDescription: "The secret reference to get the secret from",
+				MarkdownDescription: "The secret reference to get the secret from.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(`^op://[a-zA-Z0-9_-]+/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$`), "Invalid secret reference"),
+					&OnePasswordSecretReferenceValidator{client: r.client},
 				},
 			},
 			"value": schema.StringAttribute{
-				MarkdownDescription: "The returned secret value",
+				MarkdownDescription: "The returned secret value.",
 				Computed:            true,
 				Sensitive:           true,
 			},
@@ -78,6 +93,7 @@ func (r *OnePasswordEphemeralSecret) Schema(ctx context.Context, req ephemeral.S
 	}
 }
 
+// Open resolves the secret reference and sets the value.
 func (r *OnePasswordEphemeralSecret) Open(ctx context.Context, req ephemeral.OpenRequest, resp *ephemeral.OpenResponse) {
 	var data OnePasswordEphemeralSecretModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -109,3 +125,39 @@ func (r *OnePasswordEphemeralSecret) Open(ctx context.Context, req ephemeral.Ope
 
 	tflog.Debug(ctx, "1password: succesfully opened ephemeral resource")
 }
+
+// OnePasswordSecretReferenceValidator validates 1Password secret reference strings.
+type OnePasswordSecretReferenceValidator struct {
+	client *client.ClientWrapper
+}
+
+// Description implements [validator.String].
+func (o *OnePasswordSecretReferenceValidator) Description(context.Context) string {
+	return "string must be a valid 1Password secret reference format: op://<vault>/<item>[/<section>]/<field-name>?attribute=<attribute-value>"
+}
+
+// MarkdownDescription implements [validator.String].
+func (o *OnePasswordSecretReferenceValidator) MarkdownDescription(context.Context) string {
+	return "string must be a valid 1Password secret reference format: `op://<vault>/<item>[/<section>]/<field-name>?attribute=<attribute-value>`. [More information](https://developer.1password.com/docs/cli/secret-reference-syntax/)"
+}
+
+// ValidateString implements [validator.String].
+func (o *OnePasswordSecretReferenceValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	err := o.client.ValidateSecretReference(ctx, req.ConfigValue.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"1password: failed to validate secret reference",
+			err.Error(),
+		)
+	}
+
+	resp.Diagnostics.Append(resp.Diagnostics...)
+}
+
+var (
+	_ validator.String = &OnePasswordSecretReferenceValidator{}
+)

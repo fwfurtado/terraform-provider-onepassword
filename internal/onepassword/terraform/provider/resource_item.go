@@ -23,9 +23,11 @@ type OnePasswordResourceItemModel struct {
 	PasswordVersion types.Int64                           `tfsdk:"password_version"`
 	Websites        []OnePasswordResourceItemWebsiteModel `tfsdk:"websites"`
 	Tags            []types.String                        `tfsdk:"tags"`
+	Version         types.Int64                           `tfsdk:"version"`
+	Note            types.String                          `tfsdk:"note"`
 	Notes           types.String                          `tfsdk:"notes"`
 	Document        *OnePasswordResourceItemDocumentModel `tfsdk:"document"`
-	Sections        []OnePasswordResourceItemSectionModel `tfsdk:"sections"`
+	Sections        *OnePasswordSectionMapModel           `tfsdk:"sections"`
 }
 
 // OnePasswordResourceItemWebsiteModel maps item website attributes.
@@ -49,13 +51,15 @@ type OnePasswordResourceItemSectionModel struct {
 
 // OnePasswordResourceItemFieldModel represents a field in an item section.
 type OnePasswordResourceItemFieldModel struct {
-	Label   types.String                         `tfsdk:"label"`
-	Type    types.String                         `tfsdk:"type"`
-	Value   types.String                         `tfsdk:"value"`
-	File    *OnePasswordResourceItemFileModel    `tfsdk:"file"`
-	Address *OnePasswordResourceItemAddressModel `tfsdk:"address"`
-	SSHKey  *OnePasswordResourceItemSSHKeyModel  `tfsdk:"ssh_key"`
-	TOTP    *OnePasswordResourceItemTOTPModel    `tfsdk:"totp"`
+	Label    types.String                         `tfsdk:"label"`
+	ID       types.String                         `tfsdk:"id"`
+	Type     types.String                         `tfsdk:"type"`
+	Value    types.String                         `tfsdk:"value"`
+	Metadata types.Map                            `tfsdk:"metadata"`
+	File     *OnePasswordResourceItemFileModel    `tfsdk:"file"`
+	Address  *OnePasswordResourceItemAddressModel `tfsdk:"address"`
+	SSHKey   *OnePasswordResourceItemSSHKeyModel  `tfsdk:"ssh_key"`
+	TOTP     *OnePasswordResourceItemTOTPModel    `tfsdk:"totp"`
 }
 
 // OnePasswordResourceItemFileModel represents a file attachment for a field.
@@ -76,6 +80,7 @@ type OnePasswordResourceItemAddressModel struct {
 // OnePasswordResourceItemSSHKeyModel holds SSH key field details.
 type OnePasswordResourceItemSSHKeyModel struct {
 	PublicKey   types.String `tfsdk:"public_key"`
+	PrivateKey  types.String `tfsdk:"private_key"`
 	Fingerprint types.String `tfsdk:"fingerprint"`
 	KeyType     types.String `tfsdk:"key_type"`
 }
@@ -129,7 +134,32 @@ func (r *OnePasswordResourceItem) Configure(ctx context.Context, req resource.Co
 // Schema defines the schema for the onepassword_item resource.
 func (r *OnePasswordResourceItem) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manage 1Password items.",
+		MarkdownDescription: "Manage 1Password items.\n\n" +
+			"Example:\n" +
+			"```hcl\n" +
+			"resource \"onepassword_item\" \"app_login\" {\n" +
+			"  vault    = \"Engineering\"\n" +
+			"  name     = \"App Login\"\n" +
+			"  category = \"login\"\n" +
+			"\n" +
+			"  username = \"app-user\"\n" +
+			"  password = var.app_password\n" +
+			"\n" +
+			"  websites = [\n" +
+			"    {\n" +
+			"      url               = \"https://app.example.com\"\n" +
+			"      label             = \"App\"\n" +
+			"      autofill_behavior = \"exact-domain\"\n" +
+			"    }\n" +
+			"  ]\n" +
+			"\n" +
+			"  notes = \"Managed by Terraform\"\n" +
+			"  tags  = [\"terraform\", \"app\"]\n" +
+			"}\n" +
+			"```\n\n" +
+			"References:\n" +
+			"- https://developer.1password.com/docs/cli/item-categories/\n" +
+			"- https://developer.hashicorp.com/terraform/language/resources/syntax",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Item ID.",
@@ -144,8 +174,9 @@ func (r *OnePasswordResourceItem) Schema(_ context.Context, _ resource.SchemaReq
 				Required:            true,
 			},
 			"category": schema.StringAttribute{
-				MarkdownDescription: "Item category.",
-				Required:            true,
+				MarkdownDescription: "Item category. Use 1Password item category names (e.g. login, secure-note, password).\n\n" +
+					"Reference: https://developer.1password.com/docs/cli/item-categories/",
+				Required: true,
 			},
 			"username": schema.StringAttribute{
 				MarkdownDescription: "Username field value.",
@@ -155,6 +186,7 @@ func (r *OnePasswordResourceItem) Schema(_ context.Context, _ resource.SchemaReq
 				MarkdownDescription: "Password field value.",
 				Optional:            true,
 				Sensitive:           true,
+				WriteOnly:           true,
 			},
 			"password_version": schema.Int64Attribute{
 				MarkdownDescription: "Version used to force password rotation.",
@@ -164,10 +196,18 @@ func (r *OnePasswordResourceItem) Schema(_ context.Context, _ resource.SchemaReq
 				MarkdownDescription: "Item notes.",
 				Optional:            true,
 			},
+			"note": schema.StringAttribute{
+				MarkdownDescription: "Item note.",
+				Optional:            true,
+			},
 			"tags": schema.ListAttribute{
 				MarkdownDescription: "Item tags.",
 				Optional:            true,
 				ElementType:         types.StringType,
+			},
+			"version": schema.Int64Attribute{
+				MarkdownDescription: "Version trigger to refresh ephemeral values.",
+				Optional:            true,
 			},
 			"websites": schema.ListNestedAttribute{
 				MarkdownDescription: "Websites associated with the item.",
@@ -201,114 +241,11 @@ func (r *OnePasswordResourceItem) Schema(_ context.Context, _ resource.SchemaReq
 						MarkdownDescription: "Document file content.",
 						Required:            true,
 						Sensitive:           true,
+						WriteOnly:           true,
 					},
 				},
 			},
-			"sections": schema.ListNestedAttribute{
-				MarkdownDescription: "Item sections and fields.",
-				Optional:            true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"label": schema.StringAttribute{
-							MarkdownDescription: "Section label. Empty label places fields at root.",
-							Optional:            true,
-						},
-						"fields": schema.ListNestedAttribute{
-							MarkdownDescription: "Fields within the section.",
-							Required:            true,
-							NestedObject: schema.NestedAttributeObject{
-								Attributes: map[string]schema.Attribute{
-									"label": schema.StringAttribute{
-										MarkdownDescription: "Field label.",
-										Optional:            true,
-									},
-									"type": schema.StringAttribute{
-										MarkdownDescription: "Field type.",
-										Required:            true,
-									},
-									"value": schema.StringAttribute{
-										MarkdownDescription: "Field value.",
-										Optional:            true,
-									},
-									"file": schema.SingleNestedAttribute{
-										MarkdownDescription: "File attachment for the field.",
-										Optional:            true,
-										Attributes: map[string]schema.Attribute{
-											"name": schema.StringAttribute{
-												MarkdownDescription: "File name.",
-												Required:            true,
-											},
-											"content": schema.StringAttribute{
-												MarkdownDescription: "File content.",
-												Required:            true,
-												Sensitive:           true,
-											},
-										},
-									},
-									"address": schema.SingleNestedAttribute{
-										MarkdownDescription: "Address details for address fields.",
-										Optional:            true,
-										Attributes: map[string]schema.Attribute{
-											"street": schema.StringAttribute{
-												MarkdownDescription: "Street.",
-												Optional:            true,
-											},
-											"city": schema.StringAttribute{
-												MarkdownDescription: "City.",
-												Optional:            true,
-											},
-											"state": schema.StringAttribute{
-												MarkdownDescription: "State.",
-												Optional:            true,
-											},
-											"zip": schema.StringAttribute{
-												MarkdownDescription: "ZIP code.",
-												Optional:            true,
-											},
-											"country": schema.StringAttribute{
-												MarkdownDescription: "Country.",
-												Optional:            true,
-											},
-										},
-									},
-									"ssh_key": schema.SingleNestedAttribute{
-										MarkdownDescription: "SSH key details for SSH key fields.",
-										Optional:            true,
-										Attributes: map[string]schema.Attribute{
-											"public_key": schema.StringAttribute{
-												MarkdownDescription: "SSH public key.",
-												Optional:            true,
-											},
-											"fingerprint": schema.StringAttribute{
-												MarkdownDescription: "SSH key fingerprint.",
-												Optional:            true,
-											},
-											"key_type": schema.StringAttribute{
-												MarkdownDescription: "SSH key type.",
-												Optional:            true,
-											},
-										},
-									},
-									"totp": schema.SingleNestedAttribute{
-										MarkdownDescription: "TOTP details for TOTP fields.",
-										Optional:            true,
-										Attributes: map[string]schema.Attribute{
-											"code": schema.StringAttribute{
-												MarkdownDescription: "Computed TOTP code.",
-												Optional:            true,
-											},
-											"error_message": schema.StringAttribute{
-												MarkdownDescription: "TOTP error message.",
-												Optional:            true,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			"sections": sectionsAttribute("Item sections map."),
 		},
 	}
 }
@@ -439,6 +376,7 @@ func (r *OnePasswordResourceItem) Delete(ctx context.Context, req resource.Delet
 	}
 }
 
+// buildItemCreateParams maps the Terraform model into the SDK create parameters.
 func buildItemCreateParams(plan *OnePasswordResourceItemModel, vaultID string, existing *onepassword.Item) (onepassword.ItemCreateParams, error) {
 	category, err := mapItemCategory(plan.Category)
 	if err != nil {
@@ -459,9 +397,8 @@ func buildItemCreateParams(plan *OnePasswordResourceItemModel, vaultID string, e
 		Files:    files,
 	}
 
-	if !plan.Notes.IsNull() && !plan.Notes.IsUnknown() {
-		notes := plan.Notes.ValueString()
-		params.Notes = &notes
+	if note := noteFromShared(SharedItemModel{Note: plan.Note, Notes: plan.Notes}); note != nil {
+		params.Notes = note
 	}
 
 	if len(plan.Tags) > 0 {
@@ -487,6 +424,7 @@ func buildItemCreateParams(plan *OnePasswordResourceItemModel, vaultID string, e
 	return params, nil
 }
 
+// buildItemForUpdate maps the Terraform model into an SDK update item.
 func buildItemForUpdate(plan *OnePasswordResourceItemModel, vaultID string, existing *onepassword.Item) (onepassword.Item, error) {
 	category, err := mapItemCategory(plan.Category)
 	if err != nil {
@@ -509,8 +447,8 @@ func buildItemForUpdate(plan *OnePasswordResourceItemModel, vaultID string, exis
 		Version:  existing.Version,
 	}
 
-	if !plan.Notes.IsNull() && !plan.Notes.IsUnknown() {
-		item.Notes = plan.Notes.ValueString()
+	if note := noteFromShared(SharedItemModel{Note: plan.Note, Notes: plan.Notes}); note != nil {
+		item.Notes = *note
 	}
 
 	if len(plan.Tags) > 0 {
@@ -536,35 +474,16 @@ func buildItemForUpdate(plan *OnePasswordResourceItemModel, vaultID string, exis
 	return item, nil
 }
 
+// buildItemSectionsAndFields turns sections/fields into 1Password SDK structures.
 func buildItemSectionsAndFields(plan *OnePasswordResourceItemModel, existing *onepassword.Item) ([]onepassword.ItemSection, []onepassword.ItemField, []onepassword.FileCreateParams, error) {
-	sections := make([]onepassword.ItemSection, 0)
-	fields := make([]onepassword.ItemField, 0)
-	files := make([]onepassword.FileCreateParams, 0)
-
-	sectionIDs := map[string]string{}
-	fieldIDs := map[string]string{}
-
-	if existing != nil {
-		for _, section := range existing.Sections {
-			sectionIDs[section.Title] = section.ID
-		}
-
-		for _, field := range existing.Fields {
-			sectionKey := "root"
-			if field.SectionID != nil {
-				sectionKey = *field.SectionID
-			}
-			fieldIDs[sectionKey+":"+field.Title] = field.ID
-		}
+	sections, fields, files, err := buildSectionsFromMap(plan.Sections, existing)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	if username, ok := getOptionalString(plan.Username); ok {
-		fieldID := fieldIDs["root:username"]
-		if fieldID == "" {
-			fieldID = "username"
-		}
 		fields = append(fields, onepassword.ItemField{
-			ID:        fieldID,
+			ID:        "username",
 			Title:     "username",
 			FieldType: onepassword.ItemFieldTypeText,
 			Value:     username,
@@ -572,110 +491,18 @@ func buildItemSectionsAndFields(plan *OnePasswordResourceItemModel, existing *on
 	}
 
 	if password, ok := getOptionalString(plan.Password); ok {
-		fieldID := fieldIDs["root:password"]
-		if fieldID == "" {
-			fieldID = "password"
-		}
 		fields = append(fields, onepassword.ItemField{
-			ID:        fieldID,
+			ID:        "password",
 			Title:     "password",
 			FieldType: onepassword.ItemFieldTypeConcealed,
 			Value:     password,
 		})
 	}
 
-	for sectionIndex, section := range plan.Sections {
-		sectionLabel, hasLabel := getOptionalString(section.Label)
-		var sectionID string
-		if hasLabel {
-			sectionID = sectionIDs[sectionLabel]
-			if sectionID == "" {
-				sectionID = fmt.Sprintf("section-%d", sectionIndex)
-			}
-			sections = append(sections, onepassword.ItemSection{
-				ID:    sectionID,
-				Title: sectionLabel,
-			})
-		}
-
-		for fieldIndex, fieldModel := range section.Fields {
-			fieldType, err := mapFieldType(fieldModel.Type)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-
-			fieldLabel, _ := getOptionalString(fieldModel.Label)
-			fieldValue, _ := getOptionalString(fieldModel.Value)
-
-			sectionKey := "root"
-			var sectionIDPtr *string
-			if hasLabel {
-				sectionKey = sectionID
-				sectionIDPtr = &sectionID
-			}
-
-			fieldID := fieldIDs[sectionKey+":"+fieldLabel]
-			if fieldID == "" {
-				fieldID = fmt.Sprintf("field-%d-%d", sectionIndex, fieldIndex)
-			}
-
-			itemField := onepassword.ItemField{
-				ID:        fieldID,
-				Title:     fieldLabel,
-				SectionID: sectionIDPtr,
-				FieldType: fieldType,
-				Value:     fieldValue,
-			}
-
-			if fieldModel.Address != nil {
-				address := onepassword.AddressFieldDetails{
-					Street:  valueOrEmpty(fieldModel.Address.Street),
-					City:    valueOrEmpty(fieldModel.Address.City),
-					State:   valueOrEmpty(fieldModel.Address.State),
-					Zip:     valueOrEmpty(fieldModel.Address.Zip),
-					Country: valueOrEmpty(fieldModel.Address.Country),
-				}
-				details := onepassword.NewItemFieldDetailsTypeVariantAddress(&address)
-				itemField.Details = &details
-			}
-
-			if fieldModel.SSHKey != nil {
-				sshKey := onepassword.SSHKeyAttributes{
-					PublicKey:   valueOrEmpty(fieldModel.SSHKey.PublicKey),
-					Fingerprint: valueOrEmpty(fieldModel.SSHKey.Fingerprint),
-					KeyType:     valueOrEmpty(fieldModel.SSHKey.KeyType),
-				}
-				details := onepassword.NewItemFieldDetailsTypeVariantSSHKey(&sshKey)
-				itemField.Details = &details
-			}
-
-			if fieldModel.TOTP != nil {
-				totp := onepassword.OTPFieldDetails{}
-				if code, ok := getOptionalString(fieldModel.TOTP.Code); ok {
-					totp.Code = &code
-				}
-				if message, ok := getOptionalString(fieldModel.TOTP.ErrorMessage); ok {
-					totp.ErrorMessage = &message
-				}
-				details := onepassword.NewItemFieldDetailsTypeVariantOTP(&totp)
-				itemField.Details = &details
-			}
-
-			fields = append(fields, itemField)
-
-			if fieldModel.File != nil {
-				file, err := mapFile(fieldModel.File, fieldID, sectionID)
-				if err != nil {
-					return nil, nil, nil, err
-				}
-				files = append(files, *file)
-			}
-		}
-	}
-
 	return sections, fields, files, nil
 }
 
+// mapItemCategory normalizes the category string to the SDK enum.
 func mapItemCategory(value types.String) (onepassword.ItemCategory, error) {
 	if value.IsNull() || value.IsUnknown() {
 		return "", fmt.Errorf("category is required")
@@ -735,6 +562,7 @@ func mapItemCategory(value types.String) (onepassword.ItemCategory, error) {
 	}
 }
 
+// mapFieldType normalizes the field type string to the SDK enum.
 func mapFieldType(value types.String) (onepassword.ItemFieldType, error) {
 	if value.IsNull() || value.IsUnknown() {
 		return "", fmt.Errorf("field type is required")
@@ -776,6 +604,7 @@ func mapFieldType(value types.String) (onepassword.ItemFieldType, error) {
 	}
 }
 
+// mapWebsites converts Terraform website models to SDK website entries.
 func mapWebsites(websites []OnePasswordResourceItemWebsiteModel) ([]onepassword.Website, error) {
 	result := make([]onepassword.Website, 0, len(websites))
 	for _, website := range websites {
@@ -802,6 +631,7 @@ func mapWebsites(websites []OnePasswordResourceItemWebsiteModel) ([]onepassword.
 	return result, nil
 }
 
+// mapAutofillBehavior converts the HCL string into the SDK autofill behavior.
 func mapAutofillBehavior(value string) (onepassword.AutofillBehavior, error) {
 	switch strings.ToLower(value) {
 	case "anywhere-on-website":
@@ -815,6 +645,7 @@ func mapAutofillBehavior(value string) (onepassword.AutofillBehavior, error) {
 	}
 }
 
+// mapDocument converts a Terraform document model into SDK create parameters.
 func mapDocument(document *OnePasswordResourceItemDocumentModel) (*onepassword.DocumentCreateParams, error) {
 	if document.Name.IsNull() || document.Name.IsUnknown() {
 		return nil, fmt.Errorf("document name is required")
@@ -829,6 +660,7 @@ func mapDocument(document *OnePasswordResourceItemDocumentModel) (*onepassword.D
 	}, nil
 }
 
+// mapFile converts a file model into SDK create parameters tied to a field/section.
 func mapFile(file *OnePasswordResourceItemFileModel, fieldID string, sectionID string) (*onepassword.FileCreateParams, error) {
 	if file.Name.IsNull() || file.Name.IsUnknown() {
 		return nil, fmt.Errorf("file name is required")
@@ -845,6 +677,7 @@ func mapFile(file *OnePasswordResourceItemFileModel, fieldID string, sectionID s
 	}, nil
 }
 
+// mapTags flattens the Terraform tag list into plain strings.
 func mapTags(tags []types.String) []string {
 	result := make([]string, 0, len(tags))
 	for _, tag := range tags {
@@ -856,6 +689,7 @@ func mapTags(tags []types.String) []string {
 	return result
 }
 
+// getOptionalString reads a string value that may be null/unknown.
 func getOptionalString(value types.String) (string, bool) {
 	if value.IsNull() || value.IsUnknown() {
 		return "", false
@@ -863,6 +697,7 @@ func getOptionalString(value types.String) (string, bool) {
 	return value.ValueString(), true
 }
 
+// valueOrEmpty returns a string or empty when unknown/null.
 func valueOrEmpty(value types.String) string {
 	if value.IsNull() || value.IsUnknown() {
 		return ""
@@ -870,6 +705,7 @@ func valueOrEmpty(value types.String) string {
 	return value.ValueString()
 }
 
+// convertFilesToItemFiles maps file create parameters into item file metadata.
 func convertFilesToItemFiles(files []onepassword.FileCreateParams) []onepassword.ItemFile {
 	if len(files) == 0 {
 		return nil

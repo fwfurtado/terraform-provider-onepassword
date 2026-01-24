@@ -6,9 +6,19 @@ import (
 	"github.com/1password/onepassword-sdk-go"
 )
 
+type opClient interface {
+	Secrets() onepassword.SecretsAPI
+	Items() onepassword.ItemsAPI
+	Vaults() onepassword.VaultsAPI
+}
+
 // ClientWrapper wraps the 1Password SDK client with helper methods.
 type ClientWrapper struct {
-	inner *onepassword.Client
+	inner opClient
+}
+
+func newClientWrapper(inner opClient) *ClientWrapper {
+	return &ClientWrapper{inner: inner}
 }
 
 // NewServiceAccount creates a client using a service account token.
@@ -23,9 +33,7 @@ func NewServiceAccount(ctx context.Context, version string, token string) (*Clie
 		return nil, err
 	}
 
-	return &ClientWrapper{
-		inner: inner,
-	}, nil
+	return newClientWrapper(inner), nil
 }
 
 // NewDesktopAppIntegration creates a client using the 1Password desktop integration.
@@ -40,7 +48,5 @@ func NewDesktopAppIntegration(ctx context.Context, version string, accountName s
 		return nil, err
 	}
 
-	return &ClientWrapper{
-		inner: inner,
-	}, nil
+	return newClientWrapper(inner), nil
 }

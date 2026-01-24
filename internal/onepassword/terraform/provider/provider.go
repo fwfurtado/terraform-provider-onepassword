@@ -16,23 +16,33 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// OnePasswordProvider implements the Terraform provider for 1Password.
+// It configures authentication and registers resources/ephemeral resources.
+//
+// References:
+//   - https://developer.1password.com/docs/cli/
+//   - https://developer.1password.com/docs/service-accounts/
 type OnePasswordProvider struct {
 	version string
 }
 
+// OnePasswordProviderData represents the provider configuration block.
 type OnePasswordProviderData struct {
 	ServiceAccount        *OnePasswordProviderServiceAccountData        `tfsdk:"service_account"`
 	DesktopAppIntegration *OnePasswordProviderDesktopAppIntegrationData `tfsdk:"desktop_app_integration"`
 }
 
+// OnePasswordProviderServiceAccountData holds service account auth settings.
 type OnePasswordProviderServiceAccountData struct {
 	Token types.String `tfsdk:"token"`
 }
 
+// OnePasswordProviderDesktopAppIntegrationData holds desktop app integration settings.
 type OnePasswordProviderDesktopAppIntegrationData struct {
 	AccountName types.String `tfsdk:"account_name"`
 }
 
+// New returns a configured provider instance.
 func New(version string) *OnePasswordProvider {
 	return &OnePasswordProvider{
 		version: version,
@@ -47,12 +57,33 @@ func (p *OnePasswordProvider) Metadata(_ context.Context, _ tfprovides.MetadataR
 func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaRequest, resp *tfprovides.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "The 1Password provider allows Terraform to retrieve secrets from 1Password using ephemeral resources. " +
-			"It supports both Service Account authentication and Desktop App integration.",
+			"It supports both Service Account authentication and Desktop App integration.\n\n" +
+			"Example (service account):\n" +
+			"```hcl\n" +
+			"provider \"onepassword\" {\n" +
+			"  service_account {\n" +
+			"    token = var.op_service_account_token\n" +
+			"  }\n" +
+			"}\n" +
+			"```\n\n" +
+			"Example (desktop app integration):\n" +
+			"```hcl\n" +
+			"provider \"onepassword\" {\n" +
+			"  desktop_app_integration {\n" +
+			"    account_name = \"my.1password.com\"\n" +
+			"  }\n" +
+			"}\n" +
+			"```\n\n" +
+			"References:\n" +
+			"- https://developer.1password.com/docs/cli/\n" +
+			"- https://developer.1password.com/docs/service-accounts/\n" +
+			"- https://developer.hashicorp.com/terraform/language/providers/configuration",
 		Attributes: map[string]schema.Attribute{
 
 			"service_account": schema.SingleNestedAttribute{
 				MarkdownDescription: "Configuration for 1Password Service Account authentication. " +
-					"Mutually exclusive with desktop_app_integration.",
+					"Mutually exclusive with desktop_app_integration.\n\n" +
+					"Reference: https://developer.1password.com/docs/service-accounts/",
 				Optional: true,
 				Validators: []validator.Object{
 					objectvalidator.ConflictsWith(path.Expression(path.MatchRoot("desktop_app_integration"))),
@@ -69,7 +100,8 @@ func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaReque
 			"desktop_app_integration": schema.SingleNestedAttribute{
 				MarkdownDescription: "Configuration for 1Password Desktop App integration. " +
 					"Requires 1Password CLI to be installed and configured. " +
-					"Mutually exclusive with service_account.",
+					"Mutually exclusive with service_account.\n\n" +
+					"Reference: https://developer.1password.com/docs/cli/",
 				Optional: true,
 				Validators: []validator.Object{
 					objectvalidator.ConflictsWith(path.Expression(path.MatchRoot("service_account"))),
@@ -186,10 +218,7 @@ func (p *OnePasswordProvider) EphemeralResources(context.Context) []func() ephem
 			return &OnePasswordEphemeralSecret{}
 		},
 		func() ephemeral.EphemeralResource {
-			return &OnePasswordEphemeralItem{}
-		},
-		func() ephemeral.EphemeralResource {
-			return &OnePasswordEphemeralPassword{}
+			return &OnePasswordEphemeralSSHKey{}
 		},
 	}
 }
@@ -202,6 +231,36 @@ func (p *OnePasswordProvider) Resources(context.Context) []func() resource.Resou
 	return []func() resource.Resource{
 		func() resource.Resource {
 			return &OnePasswordResourceItem{}
+		},
+		func() resource.Resource {
+			return &OnePasswordLogin{}
+		},
+		func() resource.Resource {
+			return &OnePasswordSecureNote{}
+		},
+		func() resource.Resource {
+			return &OnePasswordCreditCard{}
+		},
+		func() resource.Resource {
+			return &OnePasswordPasswordItem{}
+		},
+		func() resource.Resource {
+			return &OnePasswordAPICredentials{}
+		},
+		func() resource.Resource {
+			return &OnePasswordDatabase{}
+		},
+		func() resource.Resource {
+			return &OnePasswordRouter{}
+		},
+		func() resource.Resource {
+			return &OnePasswordServer{}
+		},
+		func() resource.Resource {
+			return &OnePasswordSSHKey{}
+		},
+		func() resource.Resource {
+			return &OnePasswordSoftwareLicense{}
 		},
 	}
 }
