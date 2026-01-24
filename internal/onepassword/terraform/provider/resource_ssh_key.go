@@ -2,6 +2,7 @@ package onepasswordprovider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/1password/onepassword-sdk-go"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -12,10 +13,17 @@ import (
 // OnePasswordSSHKeyModel represents SSH key items.
 type OnePasswordSSHKeyModel struct {
 	SharedItemModel
-	PrivateKey  types.String `tfsdk:"private_key"`
-	PublicKey   types.String `tfsdk:"public_key"`
-	Fingerprint types.String `tfsdk:"fingerprint"`
-	KeyType     types.String `tfsdk:"key_type"`
+	PrivateKey  OnePasswordSSHKeyPrivateKeyModel `tfsdk:"private_key"`
+	PublicKey   types.String                     `tfsdk:"public_key"`
+	Fingerprint types.String                     `tfsdk:"fingerprint"`
+	KeyType     types.String                     `tfsdk:"key_type"`
+}
+
+// OnePasswordSSHKeyPrivateKeyModel holds private key settings.
+type OnePasswordSSHKeyPrivateKeyModel struct {
+	Type      types.String `tfsdk:"type"`
+	Content   types.String `tfsdk:"content"`
+	Generated types.Bool   `tfsdk:"generated"`
 }
 
 // OnePasswordSSHKey manages SSH key items.
@@ -35,12 +43,6 @@ func (r *OnePasswordSSHKey) Metadata(_ context.Context, req resource.MetadataReq
 // Schema defines the schema for SSH key items.
 func (r *OnePasswordSSHKey) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	attributes := sharedItemAttributes()
-	attributes["private_key"] = schema.StringAttribute{
-		MarkdownDescription: "SSH private key.",
-		Required:            true,
-		Sensitive:           true,
-		WriteOnly:           true,
-	}
 	attributes["public_key"] = schema.StringAttribute{
 		MarkdownDescription: "SSH public key.",
 		Computed:            true,
@@ -57,6 +59,27 @@ func (r *OnePasswordSSHKey) Schema(_ context.Context, _ resource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password SSH key items.",
 		Attributes:          attributes,
+		Blocks: map[string]schema.Block{
+			"private_key": schema.SingleNestedBlock{
+				MarkdownDescription: "Private key configuration.",
+				Attributes: map[string]schema.Attribute{
+					"type": schema.StringAttribute{
+						MarkdownDescription: "Key type to generate (rsa or ed25519).",
+						Optional:            true,
+					},
+					"content": schema.StringAttribute{
+						MarkdownDescription: "PEM-encoded private key content.",
+						Optional:            true,
+						Sensitive:           true,
+						WriteOnly:           true,
+					},
+					"generated": schema.BoolAttribute{
+						MarkdownDescription: "Whether to generate the private key.",
+						Optional:            true,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -74,15 +97,9 @@ func (r *OnePasswordSSHKey) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	privateKey, ok := getOptionalString(plan.PrivateKey)
-	if !ok {
-		resp.Diagnostics.AddError("Missing private key", "private_key is required")
-		return
-	}
-
-	publicKey, fingerprint, keyType, err := parseSSHKeyDetails(privateKey)
+	privateKey, publicKey, fingerprint, keyType, err := resolvePrivateKey(plan.PrivateKey)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse SSH key", err.Error())
+		resp.Diagnostics.AddError("Failed to resolve private key", err.Error())
 		return
 	}
 
@@ -170,15 +187,9 @@ func (r *OnePasswordSSHKey) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	privateKey, ok := getOptionalString(plan.PrivateKey)
-	if !ok {
-		resp.Diagnostics.AddError("Missing private key", "private_key is required")
-		return
-	}
-
-	publicKey, fingerprint, keyType, err := parseSSHKeyDetails(privateKey)
+	privateKey, publicKey, fingerprint, keyType, err := resolvePrivateKey(plan.PrivateKey)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse SSH key", err.Error())
+		resp.Diagnostics.AddError("Failed to resolve private key", err.Error())
 		return
 	}
 
@@ -247,4 +258,36 @@ func (r *OnePasswordSSHKey) Delete(ctx context.Context, req resource.DeleteReque
 		resp.Diagnostics.AddError("Failed to delete item", err.Error())
 		return
 	}
+}
+
+func resolvePrivateKey(model OnePasswordSSHKeyPrivateKeyModel) (string, string, string, string, error) {
+	generated := boolOrFalse(model.Generated)
+	content, hasContent := getOptionalString(model.Content)
+
+	if generated && hasContent {
+		return "", "", "", "", fmt.Errorf("private_key.content cannot be set when generated is true")
+	}
+
+	if generated {
+		keyType, ok := getOptionalString(model.Type)
+		if !ok {
+			return "", "", "", "", fmt.Errorf("private_key.type is required when generated is true")
+		}
+		privateKey, publicKey, fingerprint, normalizedType, err := generateSSHKey(keyType)
+		if err != nil {
+			return "", "", "", "", err
+		}
+		return privateKey, publicKey, fingerprint, normalizedType, nil
+	}
+
+	if !hasContent {
+		return "", "", "", "", fmt.Errorf("private_key.content is required when generated is false")
+	}
+
+	publicKey, fingerprint, keyType, err := parseSSHKeyDetails(content)
+	if err != nil {
+		return "", "", "", "", err
+	}
+
+	return content, publicKey, fingerprint, keyType, nil
 }
