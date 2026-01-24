@@ -34,17 +34,17 @@ func (r *OnePasswordEphemeralSecret) Configure(ctx context.Context, req ephemera
 		return
 	}
 
-	client, ok := req.ProviderData.(*client.ClientWrapper)
+	config, ok := req.ProviderData.(*providerConfig)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *ClientWrapper, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerConfig, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	if client == nil {
+	if config == nil || config.client == nil {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
 			"The 1Password client is required but was not configured. Please report this issue to the provider developers.",
@@ -52,7 +52,7 @@ func (r *OnePasswordEphemeralSecret) Configure(ctx context.Context, req ephemera
 		return
 	}
 
-	r.client = client
+	r.client = config.client
 }
 
 // Metadata sets the ephemeral resource type name.

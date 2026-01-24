@@ -47,9 +47,13 @@ type mockProvider struct {
 }
 
 func (p *mockProvider) Configure(_ context.Context, _ provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	resp.ResourceData = p.client
-	resp.DataSourceData = p.client
-	resp.EphemeralResourceData = p.client
+	config := &providerConfig{
+		client:      p.client,
+		defaultTags: nil,
+	}
+	resp.ResourceData = config
+	resp.DataSourceData = config
+	resp.EphemeralResourceData = config
 }
 
 func newTestClientWrapper(t *testing.T, secrets onepassword.SecretsAPI, items onepassword.ItemsAPI, vaults onepassword.VaultsAPI) *client.ClientWrapper {

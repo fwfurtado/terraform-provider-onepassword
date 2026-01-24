@@ -89,7 +89,7 @@ func (r *OnePasswordPasswordItem) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryPassword, vaultID, plan.SharedItemModel, extraFields, websites, nil)
+	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryPassword, vaultID, plan.SharedItemModel, r.defaultTags, extraFields, websites, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item parameters", err.Error())
 		return
@@ -175,7 +175,7 @@ func (r *OnePasswordPasswordItem) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryPassword, vaultID, plan.SharedItemModel, existing, extraFields, websites, nil)
+	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryPassword, vaultID, plan.SharedItemModel, existing, r.defaultTags, extraFields, websites, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item update", err.Error())
 		return

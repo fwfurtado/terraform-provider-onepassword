@@ -102,7 +102,7 @@ func (r *OnePasswordAPICredentials) Create(ctx context.Context, req resource.Cre
 	addStringField(&inputs, "hostname", onepassword.ItemFieldTypeText, plan.Hostname)
 	extraFields := buildFieldsFromInputs(inputs, nil)
 
-	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryAPICredentials, vaultID, plan.SharedItemModel, extraFields, nil, nil)
+	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryAPICredentials, vaultID, plan.SharedItemModel, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item parameters", err.Error())
 		return
@@ -188,7 +188,7 @@ func (r *OnePasswordAPICredentials) Update(ctx context.Context, req resource.Upd
 	addStringField(&inputs, "hostname", onepassword.ItemFieldTypeText, plan.Hostname)
 	extraFields := buildFieldsFromInputs(inputs, existing)
 
-	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryAPICredentials, vaultID, plan.SharedItemModel, existing, extraFields, nil, nil)
+	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryAPICredentials, vaultID, plan.SharedItemModel, existing, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item update", err.Error())
 		return

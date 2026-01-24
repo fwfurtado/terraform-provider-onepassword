@@ -119,7 +119,7 @@ func (r *OnePasswordSSHKey) Create(ctx context.Context, req resource.CreateReque
 	}}
 	extraFields := buildFieldsFromInputs(inputs, nil)
 
-	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategorySSHKey, vaultID, plan.SharedItemModel, extraFields, nil, nil)
+	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategorySSHKey, vaultID, plan.SharedItemModel, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item parameters", err.Error())
 		return
@@ -215,7 +215,7 @@ func (r *OnePasswordSSHKey) Update(ctx context.Context, req resource.UpdateReque
 	}}
 	extraFields := buildFieldsFromInputs(inputs, existing)
 
-	item, err := buildItemForUpdateFromShared(onepassword.ItemCategorySSHKey, vaultID, plan.SharedItemModel, existing, extraFields, nil, nil)
+	item, err := buildItemForUpdateFromShared(onepassword.ItemCategorySSHKey, vaultID, plan.SharedItemModel, existing, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item update", err.Error())
 		return
