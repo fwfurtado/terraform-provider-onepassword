@@ -11,9 +11,9 @@ import (
 
 // OnePasswordServerAdminConsoleModel holds admin console credentials.
 type OnePasswordServerAdminConsoleModel struct {
-	URL      types.String `tfsdk:"url"`
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
+	URL      types.String                   `tfsdk:"url"`
+	Username types.String                   `tfsdk:"username"`
+	Password OnePasswordSharedPasswordModel `tfsdk:"password"`
 }
 
 // OnePasswordServerSupportModel holds hosting provider support info.
@@ -35,7 +35,7 @@ type OnePasswordServerModel struct {
 	SharedItemModel
 	URL             types.String                           `tfsdk:"url"`
 	Username        types.String                           `tfsdk:"username"`
-	Password        types.String                           `tfsdk:"password"`
+	Password        OnePasswordSharedPasswordModel         `tfsdk:"password"`
 	AdminConsole    *OnePasswordServerAdminConsoleModel    `tfsdk:"admin_console"`
 	HostingProvider *OnePasswordServerHostingProviderModel `tfsdk:"hosting_provider"`
 }
@@ -64,32 +64,6 @@ func (r *OnePasswordServer) Schema(_ context.Context, _ resource.SchemaRequest, 
 	attributes["username"] = schema.StringAttribute{
 		MarkdownDescription: "Server username.",
 		Optional:            true,
-	}
-	attributes["password"] = schema.StringAttribute{
-		MarkdownDescription: "Server password.",
-		Optional:            true,
-		Sensitive:           true,
-		WriteOnly:           true,
-	}
-	attributes["admin_console"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Admin console credentials.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"url": schema.StringAttribute{
-				MarkdownDescription: "Admin console URL.",
-				Optional:            true,
-			},
-			"username": schema.StringAttribute{
-				MarkdownDescription: "Admin console username.",
-				Optional:            true,
-			},
-			"password": schema.StringAttribute{
-				MarkdownDescription: "Admin console password.",
-				Optional:            true,
-				Sensitive:           true,
-				WriteOnly:           true,
-			},
-		},
 	}
 	attributes["hosting_provider"] = schema.SingleNestedAttribute{
 		MarkdownDescription: "Hosting provider details.",
@@ -127,6 +101,25 @@ func (r *OnePasswordServer) Schema(_ context.Context, _ resource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password server items.",
 		Attributes:          attributes,
+		Blocks: map[string]schema.Block{
+			"password": passwordBlockSchema("Server password recipe."),
+			"admin_console": schema.SingleNestedBlock{
+				MarkdownDescription: "Admin console credentials.",
+				Attributes: map[string]schema.Attribute{
+					"url": schema.StringAttribute{
+						MarkdownDescription: "Admin console URL.",
+						Optional:            true,
+					},
+					"username": schema.StringAttribute{
+						MarkdownDescription: "Admin console username.",
+						Optional:            true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"password": passwordBlockSchema("Admin console password recipe."),
+				},
+			},
+		},
 	}
 }
 
@@ -144,14 +137,25 @@ func (r *OnePasswordServer) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	serverPassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate server password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "url", onepassword.ItemFieldTypeURL, plan.URL)
 	addStringField(&inputs, "username", onepassword.ItemFieldTypeText, plan.Username)
-	addStringField(&inputs, "password", onepassword.ItemFieldTypeConcealed, plan.Password)
+	addConcealedField(&inputs, "password", types.StringValue(serverPassword))
 	if plan.AdminConsole != nil {
+		adminPassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.AdminConsole.Password, true)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to generate admin console password", err.Error())
+			return
+		}
 		addStringField(&inputs, "admin_console_url", onepassword.ItemFieldTypeURL, plan.AdminConsole.URL)
 		addStringField(&inputs, "admin_console_username", onepassword.ItemFieldTypeText, plan.AdminConsole.Username)
-		addStringField(&inputs, "admin_console_password", onepassword.ItemFieldTypeConcealed, plan.AdminConsole.Password)
+		addConcealedField(&inputs, "admin_console_password", types.StringValue(adminPassword))
 	}
 	if plan.HostingProvider != nil {
 		addStringField(&inputs, "hosting_provider_name", onepassword.ItemFieldTypeText, plan.HostingProvider.Name)
@@ -234,14 +238,25 @@ func (r *OnePasswordServer) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	serverPassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate server password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "url", onepassword.ItemFieldTypeURL, plan.URL)
 	addStringField(&inputs, "username", onepassword.ItemFieldTypeText, plan.Username)
-	addStringField(&inputs, "password", onepassword.ItemFieldTypeConcealed, plan.Password)
+	addConcealedField(&inputs, "password", types.StringValue(serverPassword))
 	if plan.AdminConsole != nil {
+		adminPassword, _, err := generatePasswordFromShared(ctx, r.client, &plan.AdminConsole.Password, true)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to generate admin console password", err.Error())
+			return
+		}
 		addStringField(&inputs, "admin_console_url", onepassword.ItemFieldTypeURL, plan.AdminConsole.URL)
 		addStringField(&inputs, "admin_console_username", onepassword.ItemFieldTypeText, plan.AdminConsole.Username)
-		addStringField(&inputs, "admin_console_password", onepassword.ItemFieldTypeConcealed, plan.AdminConsole.Password)
+		addConcealedField(&inputs, "admin_console_password", types.StringValue(adminPassword))
 	}
 	if plan.HostingProvider != nil {
 		addStringField(&inputs, "hosting_provider_name", onepassword.ItemFieldTypeText, plan.HostingProvider.Name)
