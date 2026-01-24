@@ -12,7 +12,7 @@ import (
 // OnePasswordPasswordItemModel represents the password resource.
 type OnePasswordPasswordItemModel struct {
 	SharedItemModel
-	Password types.String                          `tfsdk:"password"`
+	Password OnePasswordSharedPasswordModel        `tfsdk:"password"`
 	Websites map[string]OnePasswordWebsiteMapModel `tfsdk:"websites"`
 }
 
@@ -33,12 +33,6 @@ func (r *OnePasswordPasswordItem) Metadata(_ context.Context, req resource.Metad
 // Schema defines the schema for the password resource.
 func (r *OnePasswordPasswordItem) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	attributes := sharedItemAttributes()
-	attributes["password"] = schema.StringAttribute{
-		MarkdownDescription: "Password value.",
-		Required:            true,
-		Sensitive:           true,
-		WriteOnly:           true,
-	}
 	attributes["websites"] = schema.MapNestedAttribute{
 		MarkdownDescription: "Website entries keyed by name.",
 		Optional:            true,
@@ -59,6 +53,9 @@ func (r *OnePasswordPasswordItem) Schema(_ context.Context, _ resource.SchemaReq
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password password items.",
 		Attributes:          attributes,
+		Blocks: map[string]schema.Block{
+			"password": passwordBlockSchema("Password recipe for this item."),
+		},
 	}
 }
 
@@ -76,8 +73,14 @@ func (r *OnePasswordPasswordItem) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
+	password, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
-	addStringField(&inputs, "password", onepassword.ItemFieldTypeConcealed, plan.Password)
+	addConcealedField(&inputs, "password", types.StringValue(password))
 	extraFields := buildFieldsFromInputs(inputs, nil)
 
 	websites, err := mapWebsitesFromMap(plan.Websites)
@@ -156,8 +159,14 @@ func (r *OnePasswordPasswordItem) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
+	password, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
-	addStringField(&inputs, "password", onepassword.ItemFieldTypeConcealed, plan.Password)
+	addConcealedField(&inputs, "password", types.StringValue(password))
 	extraFields := buildFieldsFromInputs(inputs, existing)
 
 	websites, err := mapWebsitesFromMap(plan.Websites)
