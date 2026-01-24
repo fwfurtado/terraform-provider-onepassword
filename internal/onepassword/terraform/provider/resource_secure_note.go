@@ -50,7 +50,7 @@ func (r *OnePasswordSecureNote) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategorySecureNote, vaultID, plan.SharedItemModel, nil, nil, nil)
+	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategorySecureNote, vaultID, plan.SharedItemModel, r.defaultTags, nil, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item parameters", err.Error())
 		return
@@ -120,7 +120,7 @@ func (r *OnePasswordSecureNote) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	item, err := buildItemForUpdateFromShared(onepassword.ItemCategorySecureNote, vaultID, plan.SharedItemModel, existing, nil, nil, nil)
+	item, err := buildItemForUpdateFromShared(onepassword.ItemCategorySecureNote, vaultID, plan.SharedItemModel, existing, r.defaultTags, nil, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item update", err.Error())
 		return

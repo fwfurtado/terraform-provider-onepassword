@@ -184,7 +184,7 @@ func (r *OnePasswordSoftwareLicense) Create(ctx context.Context, req resource.Cr
 	}
 	extraFields := buildFieldsFromInputs(inputs, nil)
 
-	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategorySoftwareLicense, vaultID, plan.SharedItemModel, extraFields, nil, nil)
+	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategorySoftwareLicense, vaultID, plan.SharedItemModel, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item parameters", err.Error())
 		return
@@ -278,7 +278,7 @@ func (r *OnePasswordSoftwareLicense) Update(ctx context.Context, req resource.Up
 	}
 	extraFields := buildFieldsFromInputs(inputs, existing)
 
-	item, err := buildItemForUpdateFromShared(onepassword.ItemCategorySoftwareLicense, vaultID, plan.SharedItemModel, existing, extraFields, nil, nil)
+	item, err := buildItemForUpdateFromShared(onepassword.ItemCategorySoftwareLicense, vaultID, plan.SharedItemModel, existing, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item update", err.Error())
 		return

@@ -2,7 +2,9 @@ package onepasswordprovider
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"sort"
 
 	"github.com/fwfurtado/onepassword-tf-provider/internal/onepassword/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
@@ -30,6 +32,7 @@ type OnePasswordProvider struct {
 type OnePasswordProviderData struct {
 	ServiceAccount        *OnePasswordProviderServiceAccountData        `tfsdk:"service_account"`
 	DesktopAppIntegration *OnePasswordProviderDesktopAppIntegrationData `tfsdk:"desktop_app_integration"`
+	DefaultTags           *OnePasswordProviderDefaultTagsData           `tfsdk:"default_tags"`
 }
 
 // OnePasswordProviderServiceAccountData holds service account auth settings.
@@ -40,6 +43,16 @@ type OnePasswordProviderServiceAccountData struct {
 // OnePasswordProviderDesktopAppIntegrationData holds desktop app integration settings.
 type OnePasswordProviderDesktopAppIntegrationData struct {
 	AccountName types.String `tfsdk:"account_name"`
+}
+
+type providerConfig struct {
+	client      *client.ClientWrapper
+	defaultTags []string
+}
+
+// OnePasswordProviderDefaultTagsData holds default item tags.
+type OnePasswordProviderDefaultTagsData struct {
+	Tags types.Map `tfsdk:"tags"`
 }
 
 // New returns a configured provider instance.
@@ -78,15 +91,14 @@ func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaReque
 			"- https://developer.1password.com/docs/cli/\n" +
 			"- https://developer.1password.com/docs/service-accounts/\n" +
 			"- https://developer.hashicorp.com/terraform/language/providers/configuration",
-		Attributes: map[string]schema.Attribute{
+		Blocks: map[string]schema.Block{
 
-			"service_account": schema.SingleNestedAttribute{
+			"service_account": schema.SingleNestedBlock{
 				MarkdownDescription: "Configuration for 1Password Service Account authentication. " +
 					"Mutually exclusive with desktop_app_integration.\n\n" +
 					"Reference: https://developer.1password.com/docs/service-accounts/",
-				Optional: true,
 				Validators: []validator.Object{
-					objectvalidator.ConflictsWith(path.Expression(path.MatchRoot("desktop_app_integration"))),
+					objectvalidator.ExactlyOneOf(path.MatchRoot("desktop_app_integration")),
 				},
 				Attributes: map[string]schema.Attribute{
 					"token": schema.StringAttribute{
@@ -97,19 +109,28 @@ func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaReque
 				},
 			},
 
-			"desktop_app_integration": schema.SingleNestedAttribute{
+			"desktop_app_integration": schema.SingleNestedBlock{
 				MarkdownDescription: "Configuration for 1Password Desktop App integration. " +
 					"Requires 1Password CLI to be installed and configured. " +
 					"Mutually exclusive with service_account.\n\n" +
 					"Reference: https://developer.1password.com/docs/cli/",
-				Optional: true,
 				Validators: []validator.Object{
-					objectvalidator.ConflictsWith(path.Expression(path.MatchRoot("service_account"))),
+					objectvalidator.ExactlyOneOf(path.MatchRoot("service_account")),
 				},
 				Attributes: map[string]schema.Attribute{
 					"account_name": schema.StringAttribute{
 						MarkdownDescription: "The 1Password account name to use. Optional - if not specified, uses the default account.",
 						Optional:            true,
+					},
+				},
+			},
+			"default_tags": schema.SingleNestedBlock{
+				MarkdownDescription: "Default tags to apply to all items created by this provider.",
+				Attributes: map[string]schema.Attribute{
+					"tags": schema.MapAttribute{
+						MarkdownDescription: "Default tag key-value pairs.",
+						Optional:            true,
+						ElementType:         types.StringType,
 					},
 				},
 			},
@@ -143,6 +164,7 @@ func (p *OnePasswordProvider) Configure(ctx context.Context, req tfprovides.Conf
 	}
 
 	var onePasswordClient *client.ClientWrapper
+	var defaultTags []string
 
 	if data.ServiceAccount != nil {
 		token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
@@ -207,9 +229,36 @@ func (p *OnePasswordProvider) Configure(ctx context.Context, req tfprovides.Conf
 
 	}
 
-	resp.ResourceData = onePasswordClient
-	resp.DataSourceData = onePasswordClient
-	resp.EphemeralResourceData = onePasswordClient
+	if data.DefaultTags != nil && !data.DefaultTags.Tags.IsNull() && !data.DefaultTags.Tags.IsUnknown() {
+		tagMap := map[string]string{}
+		resp.Diagnostics.Append(data.DefaultTags.Tags.ElementsAs(ctx, &tagMap, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		keys := make([]string, 0, len(tagMap))
+		for key := range tagMap {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			value := tagMap[key]
+			if value == "" {
+				defaultTags = append(defaultTags, key)
+				continue
+			}
+			defaultTags = append(defaultTags, fmt.Sprintf("%s=%s", key, value))
+		}
+	}
+
+	config := &providerConfig{
+		client:      onePasswordClient,
+		defaultTags: defaultTags,
+	}
+	resp.ResourceData = config
+	resp.DataSourceData = config
+	resp.EphemeralResourceData = config
 }
 
 func (p *OnePasswordProvider) EphemeralResources(context.Context) []func() ephemeral.EphemeralResource {

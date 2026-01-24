@@ -98,7 +98,8 @@ type OnePasswordWebsiteMapModel struct {
 
 // BaseItemResource holds the configured client.
 type BaseItemResource struct {
-	client *client.ClientWrapper
+	client      *client.ClientWrapper
+	defaultTags []string
 }
 
 // Configure stores the configured 1Password client.
@@ -107,16 +108,16 @@ func (r *BaseItemResource) Configure(ctx context.Context, req resource.Configure
 		return
 	}
 
-	clientWrapper, ok := req.ProviderData.(*client.ClientWrapper)
+	config, ok := req.ProviderData.(*providerConfig)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *ClientWrapper, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerConfig, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	if clientWrapper == nil {
+	if config == nil || config.client == nil {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
 			"The 1Password client is required but was not configured. Please report this issue to the provider developers.",
@@ -124,7 +125,8 @@ func (r *BaseItemResource) Configure(ctx context.Context, req resource.Configure
 		return
 	}
 
-	r.client = clientWrapper
+	r.client = config.client
+	r.defaultTags = config.defaultTags
 }
 
 func sharedItemAttributes() map[string]schema.Attribute {
@@ -688,6 +690,35 @@ func mapTags(tags []types.String) []string {
 	return result
 }
 
+func mergeTags(defaultTags []string, resourceTags []types.String) []string {
+	merged := make([]string, 0, len(defaultTags)+len(resourceTags))
+	seen := map[string]struct{}{}
+
+	for _, tag := range defaultTags {
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		merged = append(merged, tag)
+	}
+
+	for _, tag := range mapTags(resourceTags) {
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		merged = append(merged, tag)
+	}
+
+	return merged
+}
+
 // getOptionalString reads a string value that may be null/unknown.
 func getOptionalString(value types.String) (string, bool) {
 	if value.IsNull() || value.IsUnknown() {
@@ -838,6 +869,7 @@ func buildItemCreateParamsFromShared(
 	category onepassword.ItemCategory,
 	vaultID string,
 	base SharedItemModel,
+	defaultTags []string,
 	extraFields []onepassword.ItemField,
 	websites []onepassword.Website,
 	document *onepassword.DocumentCreateParams,
@@ -864,8 +896,9 @@ func buildItemCreateParamsFromShared(
 		params.Notes = note
 	}
 
-	if len(base.Tags) > 0 {
-		params.Tags = mapTags(base.Tags)
+	mergedTags := mergeTags(defaultTags, base.Tags)
+	if len(mergedTags) > 0 {
+		params.Tags = mergedTags
 	}
 
 	if len(websites) > 0 {
@@ -884,6 +917,7 @@ func buildItemForUpdateFromShared(
 	vaultID string,
 	base SharedItemModel,
 	existing *onepassword.Item,
+	defaultTags []string,
 	extraFields []onepassword.ItemField,
 	websites []onepassword.Website,
 	document *onepassword.DocumentCreateParams,
@@ -912,8 +946,9 @@ func buildItemForUpdateFromShared(
 		item.Notes = *note
 	}
 
-	if len(base.Tags) > 0 {
-		item.Tags = mapTags(base.Tags)
+	mergedTags := mergeTags(defaultTags, base.Tags)
+	if len(mergedTags) > 0 {
+		item.Tags = mergedTags
 	}
 
 	if len(websites) > 0 {

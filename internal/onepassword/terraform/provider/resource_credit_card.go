@@ -81,7 +81,7 @@ func (r *OnePasswordCreditCard) Create(ctx context.Context, req resource.CreateR
 	addStringField(&inputs, "expiry", onepassword.ItemFieldTypeMonthYear, plan.Expiry)
 	extraFields := buildFieldsFromInputs(inputs, nil)
 
-	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryCreditCard, vaultID, plan.SharedItemModel, extraFields, nil, nil)
+	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryCreditCard, vaultID, plan.SharedItemModel, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item parameters", err.Error())
 		return
@@ -158,7 +158,7 @@ func (r *OnePasswordCreditCard) Update(ctx context.Context, req resource.UpdateR
 	addStringField(&inputs, "expiry", onepassword.ItemFieldTypeMonthYear, plan.Expiry)
 	extraFields := buildFieldsFromInputs(inputs, existing)
 
-	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryCreditCard, vaultID, plan.SharedItemModel, existing, extraFields, nil, nil)
+	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryCreditCard, vaultID, plan.SharedItemModel, existing, r.defaultTags, extraFields, nil, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item update", err.Error())
 		return

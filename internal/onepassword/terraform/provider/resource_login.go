@@ -95,7 +95,7 @@ func (r *OnePasswordLogin) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryLogin, vaultID, plan.SharedItemModel, extraFields, websites, nil)
+	params, err := buildItemCreateParamsFromShared(onepassword.ItemCategoryLogin, vaultID, plan.SharedItemModel, r.defaultTags, extraFields, websites, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item parameters", err.Error())
 		return
@@ -182,7 +182,7 @@ func (r *OnePasswordLogin) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryLogin, vaultID, plan.SharedItemModel, existing, extraFields, websites, nil)
+	item, err := buildItemForUpdateFromShared(onepassword.ItemCategoryLogin, vaultID, plan.SharedItemModel, existing, r.defaultTags, extraFields, websites, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to build item update", err.Error())
 		return

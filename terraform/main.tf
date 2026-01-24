@@ -79,19 +79,19 @@ resource "onepassword_password" "password" {
 }
 
 ephemeral "onepassword_secret" "password" {
-    depends_on = [ onepassword_password.password ]
-    reference = "op://${local.vault}/Example Password/password"
+  depends_on = [onepassword_password.password]
+  reference  = "op://${local.vault}/Example Password/password"
 }
 
 
 # Example create a document item
 resource "onepassword_document" "document_item" {
-  vault    = local.vault
-  name     = "Example Document"
+  vault = local.vault
+  name  = "Example Document"
 
   document {
-    filename    = "Example.pdf"
-    content = file("${path.module}/example.txt")
+    filename = "Example.pdf"
+    content  = file("${path.module}/example.txt")
   }
 
 
