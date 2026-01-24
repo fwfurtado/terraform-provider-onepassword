@@ -12,13 +12,13 @@ import (
 // OnePasswordAPICredentialsModel represents API credentials items.
 type OnePasswordAPICredentialsModel struct {
 	SharedItemModel
-	Username   types.String `tfsdk:"username"`
-	Credential types.String `tfsdk:"credential"`
-	Type       types.String `tfsdk:"type"`
-	Filename   types.String `tfsdk:"filename"`
-	ValidFrom  types.String `tfsdk:"valid_from"`
-	Expires    types.String `tfsdk:"expires"`
-	Hostname   types.String `tfsdk:"hostname"`
+	Username   types.String                   `tfsdk:"username"`
+	Credential OnePasswordSharedPasswordModel `tfsdk:"credential"`
+	Type       types.String                   `tfsdk:"type"`
+	Filename   types.String                   `tfsdk:"filename"`
+	ValidFrom  types.String                   `tfsdk:"valid_from"`
+	Expires    types.String                   `tfsdk:"expires"`
+	Hostname   types.String                   `tfsdk:"hostname"`
 }
 
 // OnePasswordAPICredentials manages API credentials items.
@@ -41,12 +41,6 @@ func (r *OnePasswordAPICredentials) Schema(_ context.Context, _ resource.SchemaR
 	attributes["username"] = schema.StringAttribute{
 		MarkdownDescription: "API username.",
 		Optional:            true,
-	}
-	attributes["credential"] = schema.StringAttribute{
-		MarkdownDescription: "API credential.",
-		Optional:            true,
-		Sensitive:           true,
-		WriteOnly:           true,
 	}
 	attributes["type"] = schema.StringAttribute{
 		MarkdownDescription: "Credential type.",
@@ -72,6 +66,9 @@ func (r *OnePasswordAPICredentials) Schema(_ context.Context, _ resource.SchemaR
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password API credentials items.",
 		Attributes:          attributes,
+		Blocks: map[string]schema.Block{
+			"credential": passwordBlockSchema("Credential recipe for API access."),
+		},
 	}
 }
 
@@ -89,9 +86,15 @@ func (r *OnePasswordAPICredentials) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	credential, _, err := generatePasswordFromShared(ctx, r.client, &plan.Credential, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate credential", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "username", onepassword.ItemFieldTypeText, plan.Username)
-	addStringField(&inputs, "credential", onepassword.ItemFieldTypeConcealed, plan.Credential)
+	addConcealedField(&inputs, "credential", types.StringValue(credential))
 	addStringField(&inputs, "type", onepassword.ItemFieldTypeText, plan.Type)
 	addStringField(&inputs, "filename", onepassword.ItemFieldTypeText, plan.Filename)
 	addStringField(&inputs, "valid_from", onepassword.ItemFieldTypeText, plan.ValidFrom)
@@ -169,9 +172,15 @@ func (r *OnePasswordAPICredentials) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	credential, _, err := generatePasswordFromShared(ctx, r.client, &plan.Credential, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate credential", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "username", onepassword.ItemFieldTypeText, plan.Username)
-	addStringField(&inputs, "credential", onepassword.ItemFieldTypeConcealed, plan.Credential)
+	addConcealedField(&inputs, "credential", types.StringValue(credential))
 	addStringField(&inputs, "type", onepassword.ItemFieldTypeText, plan.Type)
 	addStringField(&inputs, "filename", onepassword.ItemFieldTypeText, plan.Filename)
 	addStringField(&inputs, "valid_from", onepassword.ItemFieldTypeText, plan.ValidFrom)
