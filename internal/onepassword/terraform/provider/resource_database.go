@@ -12,15 +12,15 @@ import (
 // OnePasswordDatabaseModel represents database items.
 type OnePasswordDatabaseModel struct {
 	SharedItemModel
-	Type              types.String `tfsdk:"type"`
-	Server            types.String `tfsdk:"server"`
-	Port              types.Int64  `tfsdk:"port"`
-	Database          types.String `tfsdk:"database"`
-	Username          types.String `tfsdk:"username"`
-	Password          types.String `tfsdk:"password"`
-	SID               types.String `tfsdk:"sid"`
-	Alias             types.String `tfsdk:"alias"`
-	ConnectionOptions types.String `tfsdk:"connection_options"`
+	Type              types.String                   `tfsdk:"type"`
+	Server            types.String                   `tfsdk:"server"`
+	Port              types.Int64                    `tfsdk:"port"`
+	Database          types.String                   `tfsdk:"database"`
+	Username          types.String                   `tfsdk:"username"`
+	Password          OnePasswordSharedPasswordModel `tfsdk:"password"`
+	SID               types.String                   `tfsdk:"sid"`
+	Alias             types.String                   `tfsdk:"alias"`
+	ConnectionOptions types.String                   `tfsdk:"connection_options"`
 }
 
 // OnePasswordDatabase manages database items.
@@ -60,12 +60,6 @@ func (r *OnePasswordDatabase) Schema(_ context.Context, _ resource.SchemaRequest
 		MarkdownDescription: "Database username.",
 		Optional:            true,
 	}
-	attributes["password"] = schema.StringAttribute{
-		MarkdownDescription: "Database password.",
-		Optional:            true,
-		Sensitive:           true,
-		WriteOnly:           true,
-	}
 	attributes["sid"] = schema.StringAttribute{
 		MarkdownDescription: "Database SID.",
 		Optional:            true,
@@ -82,6 +76,9 @@ func (r *OnePasswordDatabase) Schema(_ context.Context, _ resource.SchemaRequest
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password database items.",
 		Attributes:          attributes,
+		Blocks: map[string]schema.Block{
+			"password": passwordBlockSchema("Password recipe for the database."),
+		},
 	}
 }
 
@@ -99,13 +96,19 @@ func (r *OnePasswordDatabase) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	password, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "type", onepassword.ItemFieldTypeText, plan.Type)
 	addStringField(&inputs, "server", onepassword.ItemFieldTypeText, plan.Server)
 	addIntField(&inputs, "port", onepassword.ItemFieldTypeText, plan.Port)
 	addStringField(&inputs, "database", onepassword.ItemFieldTypeText, plan.Database)
 	addStringField(&inputs, "username", onepassword.ItemFieldTypeText, plan.Username)
-	addStringField(&inputs, "password", onepassword.ItemFieldTypeConcealed, plan.Password)
+	addConcealedField(&inputs, "password", types.StringValue(password))
 	addStringField(&inputs, "sid", onepassword.ItemFieldTypeText, plan.SID)
 	addStringField(&inputs, "alias", onepassword.ItemFieldTypeText, plan.Alias)
 	addStringField(&inputs, "connection_options", onepassword.ItemFieldTypeText, plan.ConnectionOptions)
@@ -181,13 +184,19 @@ func (r *OnePasswordDatabase) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	password, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to generate password", err.Error())
+		return
+	}
+
 	inputs := []FieldInput{}
 	addStringField(&inputs, "type", onepassword.ItemFieldTypeText, plan.Type)
 	addStringField(&inputs, "server", onepassword.ItemFieldTypeText, plan.Server)
 	addIntField(&inputs, "port", onepassword.ItemFieldTypeText, plan.Port)
 	addStringField(&inputs, "database", onepassword.ItemFieldTypeText, plan.Database)
 	addStringField(&inputs, "username", onepassword.ItemFieldTypeText, plan.Username)
-	addStringField(&inputs, "password", onepassword.ItemFieldTypeConcealed, plan.Password)
+	addConcealedField(&inputs, "password", types.StringValue(password))
 	addStringField(&inputs, "sid", onepassword.ItemFieldTypeText, plan.SID)
 	addStringField(&inputs, "alias", onepassword.ItemFieldTypeText, plan.Alias)
 	addStringField(&inputs, "connection_options", onepassword.ItemFieldTypeText, plan.ConnectionOptions)
