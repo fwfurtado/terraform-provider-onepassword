@@ -217,9 +217,6 @@ func (p *OnePasswordProvider) EphemeralResources(context.Context) []func() ephem
 		func() ephemeral.EphemeralResource {
 			return &OnePasswordEphemeralSecret{}
 		},
-		func() ephemeral.EphemeralResource {
-			return &OnePasswordEphemeralSSHKey{}
-		},
 	}
 }
 
@@ -229,9 +226,6 @@ func (p *OnePasswordProvider) DataSources(context.Context) []func() datasource.D
 
 func (p *OnePasswordProvider) Resources(context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		func() resource.Resource {
-			return &OnePasswordResourceItem{}
-		},
 		func() resource.Resource {
 			return &OnePasswordLogin{}
 		},
@@ -243,6 +237,9 @@ func (p *OnePasswordProvider) Resources(context.Context) []func() resource.Resou
 		},
 		func() resource.Resource {
 			return &OnePasswordPasswordItem{}
+		},
+		func() resource.Resource {
+			return &OnePasswordDocument{}
 		},
 		func() resource.Resource {
 			return &OnePasswordAPICredentials{}
