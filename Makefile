@@ -1,4 +1,4 @@
-.PHONY: lint test run
+.PHONY: lint test run snapshot
 SHELL := /bin/bash
 .SHELLFLAGS := -euo pipefail -c
 
@@ -11,6 +11,9 @@ test:
 run:
 	@ go run main.go -debug > /tmp/provider.log 2>&1 &
 	@ echo "Provider is running..."
+
+snapshot:
+	@goreleaser build --snapshot --clean --single-target
 
 stop:
 	@ pkill -f "go run main.go -debug"
