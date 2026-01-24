@@ -15,7 +15,7 @@ import (
 
 // OnePasswordEphemeralSecretModel holds the secret reference and resolved value.
 type OnePasswordEphemeralSecretModel struct {
-	reference types.String `tfsdk:"reference"`
+	Reference types.String `tfsdk:"reference"`
 	Value     types.String `tfsdk:"value"`
 }
 
@@ -106,16 +106,16 @@ func (r *OnePasswordEphemeralSecret) Open(ctx context.Context, req ephemeral.Ope
 		ctx,
 		"1password: fetching secret",
 		map[string]any{
-			"secret_reference": data.reference.ValueString(),
+			"secret_reference": data.Reference.ValueString(),
 		},
 	)
 
-	secret, err := r.client.GetSecretByReference(ctx, data.reference.ValueString())
+	secret, err := r.client.GetSecretByReference(ctx, data.Reference.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"1password: failed to retrieve get item",
-			fmt.Sprintf("Could not retrieve secret '%s': %s", data.reference.ValueString(), err.Error()),
+			fmt.Sprintf("Could not retrieve secret '%s': %s", data.Reference.ValueString(), err.Error()),
 		)
 		return
 	}
