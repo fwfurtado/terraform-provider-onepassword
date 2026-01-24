@@ -41,7 +41,7 @@ func NewDesktopAppIntegration(ctx context.Context, version string, accountName s
 	inner, err := onepassword.NewClient(
 		ctx,
 		onepassword.WithDesktopAppIntegration(accountName),
-		onepassword.WithIntegrationInfo(IntegrationName, IntegrationVersion),
+		onepassword.WithIntegrationInfo(IntegrationName, version),
 	)
 
 	if err != nil {

@@ -25,7 +25,7 @@ type OnePasswordSoftwareLicenseCustomerModel struct {
 // OnePasswordSoftwareLicensePublisherModel holds publisher fields.
 type OnePasswordSoftwareLicensePublisherModel struct {
 	Name         types.String `tfsdk:"name"`
-	DownloadPage types.String `tfsdk:"donwload_page"`
+	DownloadPage types.String `tfsdk:"download_page"`
 	Website      types.String `tfsdk:"website"`
 	RetailPrice  types.Number `tfsdk:"retail_price"`
 	SupportEmail types.String `tfsdk:"support_email"`
@@ -107,7 +107,7 @@ func (r *OnePasswordSoftwareLicense) Schema(_ context.Context, _ resource.Schema
 						MarkdownDescription: "Publisher name.",
 						Optional:            true,
 					},
-					"donwload_page": schema.StringAttribute{
+					"download_page": schema.StringAttribute{
 						MarkdownDescription: "Download page URL.",
 						Optional:            true,
 					},
