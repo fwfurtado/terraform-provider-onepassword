@@ -2,7 +2,6 @@ package onepasswordprovider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/1password/onepassword-sdk-go"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -60,54 +59,7 @@ func (r *OnePasswordLogin) Schema(_ context.Context, _ resource.SchemaRequest, r
 		MarkdownDescription: "Manage 1Password login items.",
 		Attributes:          attributes,
 		Blocks: map[string]schema.Block{
-			"password": schema.SingleNestedBlock{
-				Blocks: map[string]schema.Block{
-					"random": schema.SingleNestedBlock{
-						Attributes: map[string]schema.Attribute{
-							"length": schema.Int64Attribute{
-								MarkdownDescription: "Password length.",
-								Optional:            true,
-							},
-							"digits": schema.BoolAttribute{
-								MarkdownDescription: "Include digits in password.",
-								Optional:            true,
-							},
-							"symbols": schema.BoolAttribute{
-								MarkdownDescription: "Include symbols in password.",
-								Optional:            true,
-							},
-						},
-					},
-					"pin": schema.SingleNestedBlock{
-						Attributes: map[string]schema.Attribute{
-							"length": schema.Int64Attribute{
-								MarkdownDescription: "Password length.",
-								Optional:            true,
-							},
-						},
-					},
-					"memorable": schema.SingleNestedBlock{
-						Attributes: map[string]schema.Attribute{
-							"word_count": schema.Int64Attribute{
-								MarkdownDescription: "Word count for password.",
-								Optional:            true,
-							},
-							"word_list_type": schema.StringAttribute{
-								MarkdownDescription: "Word list type for password.",
-								Optional:            true,
-							},
-							"capitalize": schema.BoolAttribute{
-								MarkdownDescription: "Capitalize one word in password.",
-								Optional:            true,
-							},
-							"separator_type": schema.StringAttribute{
-								MarkdownDescription: "Separator type for password.",
-								Optional:            true,
-							},
-						},
-					},
-				},
-			},
+			"password": passwordBlockSchema("Password recipe for this login."),
 		},
 	}
 }
@@ -126,7 +78,7 @@ func (r *OnePasswordLogin) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	password, err := r.generatePasswordFromPlan(ctx, plan)
+	password, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to generate password", err.Error())
 		return
@@ -157,19 +109,6 @@ func (r *OnePasswordLogin) Create(ctx context.Context, req resource.CreateReques
 
 	plan.ID = types.StringValue(item.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-}
-
-func (r *OnePasswordLogin) generatePasswordFromPlan(ctx context.Context, plan OnePasswordLoginModel) (string, error) {
-	recipe, err := buildPasswordRecipeFromShared(plan.Password)
-	if err != nil {
-		return "", err
-	}
-
-	password, err := r.client.GeneratePassword(ctx, recipe)
-	if err != nil {
-		return "", err
-	}
-	return password, nil
 }
 
 // Read refreshes state for a login item.
@@ -226,7 +165,7 @@ func (r *OnePasswordLogin) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	password, err := r.generatePasswordFromPlan(ctx, plan)
+	password, _, err := generatePasswordFromShared(ctx, r.client, &plan.Password, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to generate password", err.Error())
 		return
@@ -234,7 +173,7 @@ func (r *OnePasswordLogin) Update(ctx context.Context, req resource.UpdateReques
 
 	inputs := []FieldInput{}
 	addStringField(&inputs, "username", onepassword.ItemFieldTypeText, plan.Username)
-	addStringField(&inputs, "password", onepassword.ItemFieldTypeConcealed, types.StringValue(password))
+	addConcealedField(&inputs, "password", types.StringValue(password))
 	extraFields := buildFieldsFromInputs(inputs, existing)
 
 	websites, err := mapWebsitesFromMap(plan.Websites)
@@ -282,37 +221,4 @@ func (r *OnePasswordLogin) Delete(ctx context.Context, req resource.DeleteReques
 		resp.Diagnostics.AddError("Failed to delete item", err.Error())
 		return
 	}
-}
-
-func buildPasswordRecipeFromShared(data OnePasswordSharedPasswordModel) (onepassword.PasswordRecipe, error) {
-	if data.Random != nil && data.Pin == nil && data.Memorable == nil {
-		random := data.Random
-
-		return onepassword.NewPasswordRecipeTypeVariantRandom(&onepassword.PasswordRecipeRandomInner{
-			IncludeDigits:  random.Digits.ValueBool(),
-			IncludeSymbols: random.Symbols.ValueBool(),
-			Length:         uint32(random.Length.ValueInt64()),
-		}), nil
-	}
-
-	if data.Pin != nil && data.Random == nil && data.Memorable == nil {
-		pin := data.Pin
-
-		return onepassword.NewPasswordRecipeTypeVariantPin(&onepassword.PasswordRecipePinInner{
-			Length: uint32(pin.Length.ValueInt64()),
-		}), nil
-	}
-
-	if data.Memorable != nil && data.Random == nil && data.Pin == nil {
-		memorable := data.Memorable
-
-		return onepassword.NewPasswordRecipeTypeVariantMemorable(&onepassword.PasswordRecipeMemorableInner{
-			SeparatorType: onepassword.SeparatorType(memorable.SeparatorType.ValueString()),
-			Capitalize:    memorable.Capitalize.ValueBool(),
-			WordListType:  onepassword.WordListType(memorable.WordListType.ValueString()),
-			WordCount:     uint32(memorable.WordCount.ValueInt64()),
-		}), nil
-	}
-
-	return onepassword.PasswordRecipe{}, fmt.Errorf("one of random, pin or memorable must be set")
 }
