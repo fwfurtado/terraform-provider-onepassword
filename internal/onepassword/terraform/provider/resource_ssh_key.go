@@ -71,7 +71,6 @@ func (r *OnePasswordSSHKey) Schema(_ context.Context, _ resource.SchemaRequest, 
 						MarkdownDescription: "PEM-encoded private key content.",
 						Optional:            true,
 						Sensitive:           true,
-						WriteOnly:           true,
 					},
 					"generated": schema.BoolAttribute{
 						MarkdownDescription: "Whether to generate the private key.",
