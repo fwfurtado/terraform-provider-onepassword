@@ -65,39 +65,6 @@ func (r *OnePasswordServer) Schema(_ context.Context, _ resource.SchemaRequest, 
 		MarkdownDescription: "Server username.",
 		Optional:            true,
 	}
-	attributes["hosting_provider"] = schema.SingleNestedAttribute{
-		MarkdownDescription: "Hosting provider details.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				MarkdownDescription: "Hosting provider name.",
-				Optional:            true,
-			},
-			"website": schema.StringAttribute{
-				MarkdownDescription: "Hosting provider website.",
-				Optional:            true,
-			},
-			"support": schema.SingleNestedAttribute{
-				MarkdownDescription: "Support contact info.",
-				Optional:            true,
-				Attributes: map[string]schema.Attribute{
-					"url": schema.StringAttribute{
-						MarkdownDescription: "Support URL.",
-						Optional:            true,
-					},
-					"email": schema.StringAttribute{
-						MarkdownDescription: "Support email.",
-						Optional:            true,
-					},
-					"phone": schema.StringAttribute{
-						MarkdownDescription: "Support phone.",
-						Optional:            true,
-					},
-				},
-			},
-		},
-	}
-
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage 1Password server items.",
 		Attributes:          attributes,
@@ -117,6 +84,38 @@ func (r *OnePasswordServer) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 				Blocks: map[string]schema.Block{
 					"password": passwordBlockSchema("Admin console password recipe."),
+				},
+			},
+			"hosting_provider": schema.SingleNestedBlock{
+				MarkdownDescription: "Hosting provider details.",
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Hosting provider name.",
+						Optional:            true,
+					},
+					"website": schema.StringAttribute{
+						MarkdownDescription: "Hosting provider website.",
+						Optional:            true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"support": schema.SingleNestedBlock{
+						MarkdownDescription: "Support contact info.",
+						Attributes: map[string]schema.Attribute{
+							"url": schema.StringAttribute{
+								MarkdownDescription: "Support URL.",
+								Optional:            true,
+							},
+							"email": schema.StringAttribute{
+								MarkdownDescription: "Support email.",
+								Optional:            true,
+							},
+							"phone": schema.StringAttribute{
+								MarkdownDescription: "Support phone.",
+								Optional:            true,
+							},
+						},
+					},
 				},
 			},
 		},
