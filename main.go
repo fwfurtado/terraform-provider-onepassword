@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 
 	onepasswordprovider "github.com/fwfurtado/onepassword-tf-provider/internal/onepassword/terraform/provider"
@@ -19,9 +20,13 @@ const (
 var version string = "dev"
 
 func main() {
+	var debug bool
+	flag.BoolVar(&debug, "debug", false, "Enable provider debug mode.")
+	flag.Parse()
+
 	opts := providerserver.ServeOpts{
 		Address: defaultProviderAddress,
-		Debug:   true,
+		Debug:   debug,
 	}
 
 	err := providerserver.Serve(
