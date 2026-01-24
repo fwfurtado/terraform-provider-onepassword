@@ -85,13 +85,12 @@ ephemeral "onepassword_secret" "password" {
 
 
 # Example create a document item
-resource "onepassword_item" "document_item" {
+resource "onepassword_document" "document_item" {
   vault    = local.vault
   name     = "Example Document"
-  category = "document"
 
   document {
-    name    = "Example document"
+    filename    = "Example.pdf"
     content = file("${path.module}/example.txt")
   }
 
