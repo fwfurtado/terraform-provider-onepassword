@@ -46,7 +46,6 @@ func (r *OnePasswordDocument) Schema(_ context.Context, _ resource.SchemaRequest
 						MarkdownDescription: "Document content.",
 						Required:            true,
 						Sensitive:           true,
-						WriteOnly:           true,
 					},
 				},
 			},
