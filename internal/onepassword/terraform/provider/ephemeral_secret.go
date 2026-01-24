@@ -154,8 +154,6 @@ func (o *OnePasswordSecretReferenceValidator) ValidateString(ctx context.Context
 			err.Error(),
 		)
 	}
-
-	resp.Diagnostics.Append(resp.Diagnostics...)
 }
 
 var (
