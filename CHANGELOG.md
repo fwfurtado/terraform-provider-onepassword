@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/fwfurtado/onepassword-tf-provider/compare/v0.2.1...v0.2.2) (2026-01-25)
+
+
+### Bug Fixes
+
+* enable cgo builds with arm64 toolchain ([9e8b872](https://github.com/fwfurtado/onepassword-tf-provider/commit/9e8b872ec007aff64a257584ed135a5354368906))
+
 ## [0.2.1](https://github.com/fwfurtado/onepassword-tf-provider/compare/v0.2.0...v0.2.1) (2026-01-25)
 
 
