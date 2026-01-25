@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/fwfurtado/onepassword-tf-provider/compare/terraform-provider-onepassword-v0.1.1...terraform-provider-onepassword-v0.1.2) (2026-01-25)
+
+
+### Bug Fixes
+
+* release please to use PAT token ([7aaa003](https://github.com/fwfurtado/onepassword-tf-provider/commit/7aaa003fa9c565fde14f2c3dcdfa17ce6e71b045))
+
 ## [0.1.1](https://github.com/fwfurtado/onepassword-tf-provider/compare/terraform-provider-onepassword-v0.1.0...terraform-provider-onepassword-v0.1.1) (2026-01-25)
 
 
