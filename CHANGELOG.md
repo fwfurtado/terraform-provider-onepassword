@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/fwfurtado/onepassword-tf-provider/compare/terraform-provider-onepassword-v0.1.2...terraform-provider-onepassword-v0.1.3) (2026-01-25)
+
+
+### Bug Fixes
+
+* use goreleaser action v6 ([3eafd17](https://github.com/fwfurtado/onepassword-tf-provider/commit/3eafd1726474f005f441d1b7d51b4527813ce8b1))
+
 ## [0.1.2](https://github.com/fwfurtado/onepassword-tf-provider/compare/terraform-provider-onepassword-v0.1.1...terraform-provider-onepassword-v0.1.2) (2026-01-25)
 
 
