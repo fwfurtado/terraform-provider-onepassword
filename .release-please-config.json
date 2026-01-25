@@ -2,9 +2,7 @@
     "packages": {
         ".": {
             "release-type": "go",
-            "package-name": "terraform-provider-onepassword",
-            "bump-minor-pre-major": true,
-            "bump-patch-for-minor-pre-major": true
+            "package-name": "terraform-provider-onepassword"
         }
     }
 }
