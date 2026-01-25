@@ -7,17 +7,26 @@ before:
     - go mod tidy
 
 builds:
-  - id: provider
+  - id: provider_linux_amd64
     main: ./main.go
     binary: terraform-provider-onepassword
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
-      - darwin
-      - windows
     goarch:
       - amd64
+    ldflags:
+      - "-s -w -X main.version={{.Version}}"
+  - id: provider_linux_arm64
+    main: ./main.go
+    binary: terraform-provider-onepassword
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
       - arm64
     ldflags:
       - "-s -w -X main.version={{.Version}}"
