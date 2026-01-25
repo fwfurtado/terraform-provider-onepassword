@@ -86,22 +86,4 @@ ephemeral "onepassword_secret" "db_password" {
 }
 ```
 
-## Example Configuration
-
-See `terraform/` for a full example, including a default provider setup and
-resource configurations.
-
-## Development
-
-Useful targets:
-
-- `make lint`
-- `make test`
-- `make run` (starts the provider in debug mode)
-- `make apply`
-- `make destroy`
-
-The `apply` and `destroy` targets expect the provider to be running via
-`make run` so they can read `TF_REATTACH_PROVIDERS` from `/tmp/provider.log`.
-
 {{ .SchemaMarkdown }}
