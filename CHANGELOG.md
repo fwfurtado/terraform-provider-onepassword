@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.0...v0.1.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* improve provider documentation ([8e63354](https://github.com/fwfurtado/terraform-provider-onepassword/commit/8e63354283df9313f7bb208706965afdb0ec2bca))
+
 ## 0.1.0 (2026-01-25)
 
 
