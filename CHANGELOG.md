@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/fwfurtado/onepassword-tf-provider/compare/v0.2.2...v0.2.3) (2026-01-25)
+
+
+### Bug Fixes
+
+* pass gpg passphrase to goreleaser ([babbb12](https://github.com/fwfurtado/onepassword-tf-provider/commit/babbb1290b780bf35098a255447bf1defab9abbb))
+
 ## [0.2.2](https://github.com/fwfurtado/onepassword-tf-provider/compare/v0.2.1...v0.2.2) (2026-01-25)
 
 
