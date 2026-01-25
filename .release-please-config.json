@@ -2,7 +2,9 @@
     "packages": {
         ".": {
             "release-type": "go",
-            "package-name": "terraform-provider-onepassword"
+            "package-name": "terraform-provider-onepassword",
+            "include-component-in-tag": false,
+            "include-v-in-tag": true
         }
     }
 }
