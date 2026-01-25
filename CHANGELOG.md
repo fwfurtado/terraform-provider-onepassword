@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/fwfurtado/onepassword-tf-provider/compare/v0.2.0...v0.2.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* disable cgo for release builds ([b4092d2](https://github.com/fwfurtado/onepassword-tf-provider/commit/b4092d2c55cdeab62f24984fd347b78b4bbd593e))
+
 ## [0.2.0](https://github.com/fwfurtado/onepassword-tf-provider/compare/v0.1.3...v0.2.0) (2026-01-25)
 
 
