@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/fwfurtado/onepassword-tf-provider/compare/terraform-provider-onepassword-v0.1.0...terraform-provider-onepassword-v0.1.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* release types ([62d9efc](https://github.com/fwfurtado/onepassword-tf-provider/commit/62d9efc6e06078bd90decca39d6f85d12093e5b2))
+
 ## 0.1.0
 
 
