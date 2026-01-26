@@ -27,6 +27,24 @@ builds:
       - darwin_arm64
     ldflags:
       - "-s -w -X main.version={{.Version}}"
+    # Environment variables overrides for the cross-compiler
+    overrides:
+      - goos: linux
+        goarch: arm64
+        env:
+          - CC=aarch64-linux-gnu-gcc
+      - goos: darwin
+        goarch: amd64
+        env:
+          - CC=o64-clang
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CC=oa64-clang
+      - goos: windows
+        goarch: amd64
+        env:
+          - CC=x86_64-w64-mingw32-gcc
 
 archives:
   - formats: ["zip", "tar.gz"]
