@@ -18,11 +18,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
+      - name: Install GPG
+        run: apt-get update && apt-get install -y gpg
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
