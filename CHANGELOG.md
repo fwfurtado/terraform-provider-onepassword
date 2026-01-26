@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.1.1](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.0...v0.1.1) (2026-01-25)
+## [0.1.3](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.2...v0.1.3) (2026-01-26)
+
+
+### Bug Fixes
+
+* cross compilation with cgo and tarbal content and name ([8ccd3fb](https://github.com/fwfurtado/terraform-provider-onepassword/commit/8ccd3fbe00c2a5f25c98a09141a683b11141342b))
+
+## [0.1.2](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.0...v0.1.1) (2026-01-25)
 
 
 ### Bug Fixes
