@@ -9,7 +9,7 @@ before:
 builds:
   - id: terraform-provider-onepassword
     main: ./main.go
-    binary: terraform-provider-onepassword
+    binary: '{{ .ProjectName }}_v{{.Version}}'
     env:
       - CGO_ENABLED=1
     goos:
@@ -26,7 +26,7 @@ builds:
       - darwin_amd64
       - darwin_arm64
     ldflags:
-      - "-s -w -X main.version={{.Version}}"
+      - "-s -w -X main.version={{.Version}} -extldflags '-static'"
     # Environment variables overrides for the cross-compiler
     overrides:
       - goos: linux
@@ -47,28 +47,36 @@ builds:
           - CC=x86_64-w64-mingw32-gcc
 
 archives:
-  - formats: ["zip", "tar.gz"]
+  - formats: ["zip"]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - none*
 
 checksum:
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
 
 signs:
   - artifacts: checksum
     cmd: gpg
     args:
+      # if you are using this in a GitHub action or some other automated pipeline, you
+      # need to pass the batch flag to indicate its not interactive.
       - "--batch"
-      - "--yes"
-      - "--pinentry-mode"
-      - "loopback"
-      - "--passphrase"
-      - "{{ .Env.GPG_PASSPHRASE }}"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}" # set this environment variable for your signing key
       - "--output"
       - "${signature}"
       - "--detach-sign"
       - "${artifact}"
 
 release:
-  disable: false
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+  # draft: true # uncomment this to create a draft release
+changelog:
+  disable: true
