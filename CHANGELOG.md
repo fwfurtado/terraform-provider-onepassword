@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.3...v0.1.4) (2026-01-26)
+
+
+### Bug Fixes
+
+* release assets ([2efc885](https://github.com/fwfurtado/terraform-provider-onepassword/commit/2efc88559870845ceb64bc65a6063f54fa097610))
+* release assets ([303cfad](https://github.com/fwfurtado/terraform-provider-onepassword/commit/303cfad179a195597a0959f97d64a6daf65f5964))
+
 ## [0.1.3](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.2...v0.1.3) (2026-01-26)
 
 
