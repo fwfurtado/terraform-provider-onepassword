@@ -7,39 +7,35 @@ before:
     - go mod tidy
 
 builds:
-  - id: provider_linux_amd64
+  - id: terraform-provider-onepassword
     main: ./main.go
     binary: terraform-provider-onepassword
     env:
       - CGO_ENABLED=1
     goos:
       - linux
+      - darwin
+      - windows
     goarch:
       - amd64
-    ldflags:
-      - "-s -w -X main.version={{.Version}}"
-  - id: provider_linux_arm64
-    main: ./main.go
-    binary: terraform-provider-onepassword
-    env:
-      - CGO_ENABLED=1
-      - CC=aarch64-linux-gnu-gcc
-    goos:
-      - linux
-    goarch:
       - arm64
+    targets:
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - darwin_amd64
+      - darwin_arm64
     ldflags:
       - "-s -w -X main.version={{.Version}}"
 
 archives:
   - formats: ["zip", "tar.gz"]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - LICENSE
-      - README.md
+      - none*
 
 checksum:
-  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  name_template: "{{ .ProjectName }}_v{{ .Version }}_SHA256SUMS"
 
 signs:
   - artifacts: checksum
