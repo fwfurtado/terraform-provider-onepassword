@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.0...v0.2.0) (2026-01-27)
+
+
+### Features
+
+* add onepassword_secret data source ([e4c2cb0](https://github.com/fwfurtado/terraform-provider-onepassword/commit/e4c2cb017fc8375e6187789786ed12a15e690fdb))
+
 ## 0.1.0
 
 
