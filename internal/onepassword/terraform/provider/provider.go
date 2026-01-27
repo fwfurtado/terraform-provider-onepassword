@@ -270,7 +270,11 @@ func (p *OnePasswordProvider) EphemeralResources(context.Context) []func() ephem
 }
 
 func (p *OnePasswordProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		func() datasource.DataSource {
+			return &OnePasswordSecretDataSource{}
+		},
+	}
 }
 
 func (p *OnePasswordProvider) Resources(context.Context) []func() resource.Resource {
