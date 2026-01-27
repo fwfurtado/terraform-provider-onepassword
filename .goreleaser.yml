@@ -77,6 +77,6 @@ release:
   extra_files:
     - glob: 'terraform-registry-manifest.json'
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
-  # draft: true # uncomment this to create a draft release
+  draft: true # uncomment this to create a draft release
 changelog:
   disable: true
