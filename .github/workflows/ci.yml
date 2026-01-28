@@ -67,6 +67,8 @@ jobs:
               let addedLines = [];
               let hunkOldStart = null;
               let hunkNewStart = null;
+              let firstRemovedLine = null;
+              let firstAddedLine = null;
               const results = [];
 
               const flushHunk = () => {
@@ -74,21 +76,23 @@ jobs:
                   return;
                 }
 
-                if (removedLines.length > 0 && hunkOldStart !== null) {
+                const leftLine = firstRemovedLine ?? hunkOldStart;
+                if (removedLines.length > 0 && leftLine !== null) {
                   results.push({
                     commit_id: commitId,
                     path: filePath,
-                    line: hunkOldStart,
+                    line: leftLine,
                     side: 'LEFT',
                     body: `gofmt:\n${removedLines.join('\n')}`,
                   });
                 }
 
-                if (addedLines.length > 0 && hunkNewStart !== null) {
+                const rightLine = firstAddedLine ?? hunkNewStart;
+                if (addedLines.length > 0 && rightLine !== null) {
                   results.push({
                     commit_id: commitId,
                     path: filePath,
-                    line: hunkNewStart,
+                    line: rightLine,
                     side: 'RIGHT',
                     body: `gofmt:\n${addedLines.join('\n')}`,
                   });
@@ -98,6 +102,8 @@ jobs:
                 addedLines = [];
                 hunkOldStart = null;
                 hunkNewStart = null;
+                firstRemovedLine = null;
+                firstAddedLine = null;
                 hunkActive = false;
               };
 
@@ -125,6 +131,8 @@ jobs:
                   newLine = parseInt(hunk[2], 10);
                   hunkOldStart = oldLine;
                   hunkNewStart = newLine;
+                  firstRemovedLine = null;
+                  firstAddedLine = null;
                   hunkActive = true;
                   continue;
                 }
@@ -133,12 +141,18 @@ jobs:
 
                 if (line.startsWith('+') && !line.startsWith('+++')) {
                   addedLines.push(line);
+                  if (firstAddedLine === null) {
+                    firstAddedLine = newLine;
+                  }
                   newLine++;
                   continue;
                 }
 
                 if (line.startsWith('-') && !line.startsWith('---')) {
                   removedLines.push(line);
+                  if (firstRemovedLine === null) {
+                    firstRemovedLine = oldLine;
+                  }
                   oldLine++;
                   continue;
                 }
