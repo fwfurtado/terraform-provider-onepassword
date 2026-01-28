@@ -38,18 +38,17 @@ type cacheEntry struct {
 
 type Cache struct {
 	path       string
-	entries    map[string]cacheEntry
+	entries    sync.Map
 	ttlVaults  time.Duration
 	ttlItems   time.Duration
 	ttlSecrets time.Duration
 	encryptor  *Encryptor
-	mu         sync.Mutex
+	fileMu     sync.Mutex
 }
 
 func NewFileCache(path string, ttlVaults, ttlItems, ttlSecrets time.Duration, encryptor *Encryptor) (*Cache, error) {
 	c := &Cache{
 		path:       path,
-		entries:    map[string]cacheEntry{},
 		ttlVaults:  ttlVaults,
 		ttlItems:   ttlItems,
 		ttlSecrets: ttlSecrets,
@@ -124,24 +123,22 @@ func (c *Cache) getString(key string) (string, bool) {
 }
 
 func (c *Cache) getBytes(key string) ([]byte, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	entry, ok := c.entries[key]
+	entryValue, ok := c.entries.Load(key)
 	if !ok {
 		return nil, false
 	}
 
+	entry := entryValue.(cacheEntry)
 	if time.Now().After(entry.ExpiresAt) {
-		delete(c.entries, key)
-		_ = c.saveLocked()
+		c.entries.Delete(key)
+		_ = c.save()
 		return nil, false
 	}
 
 	raw, err := base64.StdEncoding.DecodeString(entry.Value)
 	if err != nil {
-		delete(c.entries, key)
-		_ = c.saveLocked()
+		c.entries.Delete(key)
+		_ = c.save()
 		return nil, false
 	}
 
@@ -151,8 +148,8 @@ func (c *Cache) getBytes(key string) ([]byte, bool) {
 		}
 		plain, err := c.encryptor.Decrypt(raw)
 		if err != nil {
-			delete(c.entries, key)
-			_ = c.saveLocked()
+			c.entries.Delete(key)
+			_ = c.save()
 			return nil, false
 		}
 		return plain, true
@@ -170,9 +167,6 @@ func (c *Cache) setBytes(key string, value []byte, ttl time.Duration, encrypt bo
 		return
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	payload := value
 	encrypted := false
 	if encrypt {
@@ -187,31 +181,25 @@ func (c *Cache) setBytes(key string, value []byte, ttl time.Duration, encrypt bo
 		encrypted = true
 	}
 
-	c.entries[key] = cacheEntry{
+	c.entries.Store(key, cacheEntry{
 		Value:     base64.StdEncoding.EncodeToString(payload),
 		ExpiresAt: time.Now().Add(ttl),
 		Encrypted: encrypted,
-	}
+	})
 
-	_ = c.saveLocked()
+	_ = c.save()
 }
 
 func (c *Cache) delete(key string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, ok := c.entries[key]; !ok {
+	if _, ok := c.entries.Load(key); !ok {
 		return
 	}
 
-	delete(c.entries, key)
-	_ = c.saveLocked()
+	c.entries.Delete(key)
+	_ = c.save()
 }
 
 func (c *Cache) load() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if c.path == "" {
 		return errors.New("cache path is empty")
 	}
@@ -237,23 +225,31 @@ func (c *Cache) load() error {
 		return errors.New("unsupported cache version")
 	}
 
-	c.entries = file.Entries
-	c.purgeExpiredLocked()
-	_ = c.saveLocked()
+	c.entries = sync.Map{}
+	for key, entry := range file.Entries {
+		c.entries.Store(key, entry)
+	}
+	c.purgeExpired()
+	_ = c.save()
 
 	return nil
 }
 
-func (c *Cache) purgeExpiredLocked() {
+func (c *Cache) purgeExpired() {
 	now := time.Now()
-	for key, entry := range c.entries {
+	c.entries.Range(func(key, value any) bool {
+		entry := value.(cacheEntry)
 		if now.After(entry.ExpiresAt) {
-			delete(c.entries, key)
+			c.entries.Delete(key)
 		}
-	}
+		return true
+	})
 }
 
-func (c *Cache) saveLocked() error {
+func (c *Cache) save() error {
+	c.fileMu.Lock()
+	defer c.fileMu.Unlock()
+
 	if c.path == "" {
 		return errors.New("cache path is empty")
 	}
@@ -265,8 +261,12 @@ func (c *Cache) saveLocked() error {
 
 	payload := cacheFile{
 		Version: cacheVersion,
-		Entries: c.entries,
+		Entries: map[string]cacheEntry{},
 	}
+	c.entries.Range(func(key, value any) bool {
+		payload.Entries[key.(string)] = value.(cacheEntry)
+		return true
+	})
 
 	data, err := json.Marshal(payload)
 	if err != nil {

@@ -99,6 +99,25 @@ func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaReque
 			"  }\n" +
 			"}\n" +
 			"```\n\n" +
+			"Example (cache):\n" +
+			"```hcl\n" +
+			"provider \"onepassword\" {\n" +
+			"  service_account {\n" +
+			"    token = var.op_service_account_token\n" +
+			"  }\n" +
+			"\n" +
+			"  cache {\n" +
+			"    enabled     = true\n" +
+			"    ttl_vaults  = \"30m\"\n" +
+			"    ttl_items   = \"10m\"\n" +
+			"    ttl_secrets = \"2m\"\n" +
+			"  }\n" +
+			"}\n" +
+			"```\n\n" +
+			"Cache notes:\n" +
+			"- Vault/item cache is plaintext; secret cache is encrypted.\n" +
+			"- Service account requires OP_CACHE_KEY when ttl_secrets > 0.\n" +
+			"- Desktop integration uses keyring first, then OP_CACHE_KEY.\n\n" +
 			"References:\n" +
 			"- https://developer.1password.com/docs/cli/\n" +
 			"- https://developer.1password.com/docs/service-accounts/\n" +
@@ -148,7 +167,8 @@ func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaReque
 			},
 			"cache": schema.SingleNestedBlock{
 				MarkdownDescription: "Optional cache settings to reduce API calls. " +
-					"Vault and item caches are stored in plaintext, while secrets are encrypted.",
+					"Vault and item caches are stored in plaintext, while secrets are encrypted. " +
+					"Service account requires OP_CACHE_KEY for ttl_secrets; desktop integration uses keyring first, then OP_CACHE_KEY.",
 				Attributes: map[string]schema.Attribute{
 					"enabled": schema.BoolAttribute{
 						MarkdownDescription: "Whether to enable the local cache.",
