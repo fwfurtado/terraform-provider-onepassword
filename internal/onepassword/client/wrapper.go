@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/1password/onepassword-sdk-go"
+	"github.com/fwfurtado/onepassword-tf-provider/internal/onepassword/cache"
 )
 
 type opClient interface {
@@ -15,14 +16,18 @@ type opClient interface {
 // ClientWrapper wraps the 1Password SDK client with helper methods.
 type ClientWrapper struct {
 	inner opClient
+	cache *cache.Cache
 }
 
-func newClientWrapper(inner opClient) *ClientWrapper {
-	return &ClientWrapper{inner: inner}
+func newClientWrapper(inner opClient, cacheStore *cache.Cache) *ClientWrapper {
+	return &ClientWrapper{
+		inner: inner,
+		cache: cacheStore,
+	}
 }
 
 // NewServiceAccount creates a client using a service account token.
-func NewServiceAccount(ctx context.Context, version string, token string) (*ClientWrapper, error) {
+func NewServiceAccount(ctx context.Context, version string, token string, cacheStore *cache.Cache) (*ClientWrapper, error) {
 	inner, err := onepassword.NewClient(
 		ctx,
 		onepassword.WithServiceAccountToken(token),
@@ -33,11 +38,11 @@ func NewServiceAccount(ctx context.Context, version string, token string) (*Clie
 		return nil, err
 	}
 
-	return newClientWrapper(inner), nil
+	return newClientWrapper(inner, cacheStore), nil
 }
 
 // NewDesktopAppIntegration creates a client using the 1Password desktop integration.
-func NewDesktopAppIntegration(ctx context.Context, version string, accountName string) (*ClientWrapper, error) {
+func NewDesktopAppIntegration(ctx context.Context, version string, accountName string, cacheStore *cache.Cache) (*ClientWrapper, error) {
 	inner, err := onepassword.NewClient(
 		ctx,
 		onepassword.WithDesktopAppIntegration(accountName),
@@ -48,5 +53,5 @@ func NewDesktopAppIntegration(ctx context.Context, version string, accountName s
 		return nil, err
 	}
 
-	return newClientWrapper(inner), nil
+	return newClientWrapper(inner, cacheStore), nil
 }

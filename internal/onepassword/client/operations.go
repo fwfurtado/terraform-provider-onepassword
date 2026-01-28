@@ -10,15 +10,39 @@ import (
 
 // GetSecretByReference resolves a secret reference to its value.
 func (c *ClientWrapper) GetSecretByReference(ctx context.Context, reference string) (string, error) {
-	return c.inner.Secrets().Resolve(ctx, reference)
+	if c.cache != nil {
+		if value, ok := c.cache.GetSecret(reference); ok {
+			return value, nil
+		}
+	}
+
+	value, err := withRetry(ctx, func(ctx context.Context) (string, error) {
+		return c.inner.Secrets().Resolve(ctx, reference)
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if c.cache != nil {
+		c.cache.SetSecret(reference, value)
+	}
+
+	return value, nil
 }
 
 // GetVault finds a vault by title and returns its ID.
 func (c *ClientWrapper) GetVault(ctx context.Context, title string) (string, error) {
+	if c.cache != nil {
+		if cachedID, ok := c.cache.GetVaultID(title); ok {
+			return cachedID, nil
+		}
+	}
 
 	decryptDetails := true
-	vaults, err := c.inner.Vaults().List(ctx, onepassword.VaultListParams{
-		DecryptDetails: &decryptDetails,
+	vaults, err := withRetry(ctx, func(ctx context.Context) ([]onepassword.VaultOverview, error) {
+		return c.inner.Vaults().List(ctx, onepassword.VaultListParams{
+			DecryptDetails: &decryptDetails,
+		})
 	})
 
 	if err != nil {
@@ -33,14 +57,36 @@ func (c *ClientWrapper) GetVault(ctx context.Context, title string) (string, err
 		return "", fmt.Errorf("vault not found")
 	}
 
+	if c.cache != nil {
+		c.cache.SetVaultID(title, vault.ID)
+	}
+
 	return vault.ID, nil
 }
 
 // GetItemOverview fetches an item overview by vault and item title.
 func (c *ClientWrapper) GetItemOverview(ctx context.Context, vaultID, name string) (*onepassword.ItemOverview, error) {
-	items, err := c.inner.Items().List(ctx, vaultID)
+	if c.cache != nil {
+		if cachedItems, ok := c.cache.GetItemOverviews(vaultID); ok {
+			item, found := lo.Find(cachedItems, func(item onepassword.ItemOverview) bool {
+				return item.Title == name
+			})
+			if !found {
+				return nil, fmt.Errorf("item not found")
+			}
+			return &item, nil
+		}
+	}
+
+	items, err := withRetry(ctx, func(ctx context.Context) ([]onepassword.ItemOverview, error) {
+		return c.inner.Items().List(ctx, vaultID)
+	})
 	if err != nil {
 		return nil, err
+	}
+
+	if c.cache != nil {
+		c.cache.SetItemOverviews(vaultID, items)
 	}
 
 	item, found := lo.Find(items, func(item onepassword.ItemOverview) bool {
@@ -56,7 +102,9 @@ func (c *ClientWrapper) GetItemOverview(ctx context.Context, vaultID, name strin
 
 // GetItem fetches a full item by vault and item ID.
 func (c *ClientWrapper) GetItem(ctx context.Context, vaultID, itemID string) (*onepassword.Item, error) {
-	item, err := c.inner.Items().Get(ctx, vaultID, itemID)
+	item, err := withRetry(ctx, func(ctx context.Context) (onepassword.Item, error) {
+		return c.inner.Items().Get(ctx, vaultID, itemID)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -81,9 +129,15 @@ func (c *ClientWrapper) GeneratePassword(ctx context.Context, recipe onepassword
 
 // CreateItem creates a new item in the specified vault.
 func (c *ClientWrapper) CreateItem(ctx context.Context, params onepassword.ItemCreateParams) (*onepassword.Item, error) {
-	item, err := c.inner.Items().Create(ctx, params)
+	item, err := withRetry(ctx, func(ctx context.Context) (onepassword.Item, error) {
+		return c.inner.Items().Create(ctx, params)
+	})
 	if err != nil {
 		return nil, err
+	}
+
+	if c.cache != nil {
+		c.cache.InvalidateItemOverviews(params.VaultID)
 	}
 
 	return &item, nil
@@ -91,9 +145,15 @@ func (c *ClientWrapper) CreateItem(ctx context.Context, params onepassword.ItemC
 
 // UpdateItem updates an existing item.
 func (c *ClientWrapper) UpdateItem(ctx context.Context, item onepassword.Item) (*onepassword.Item, error) {
-	updatedItem, err := c.inner.Items().Put(ctx, item)
+	updatedItem, err := withRetry(ctx, func(ctx context.Context) (onepassword.Item, error) {
+		return c.inner.Items().Put(ctx, item)
+	})
 	if err != nil {
 		return nil, err
+	}
+
+	if c.cache != nil {
+		c.cache.InvalidateItemOverviews(item.VaultID)
 	}
 
 	return &updatedItem, nil
@@ -101,21 +161,16 @@ func (c *ClientWrapper) UpdateItem(ctx context.Context, item onepassword.Item) (
 
 // DeleteItem deletes an item by vault and item ID.
 func (c *ClientWrapper) DeleteItem(ctx context.Context, vaultID, itemID string) error {
-	return c.inner.Items().Delete(ctx, vaultID, itemID)
+	_, err := withRetry(ctx, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, c.inner.Items().Delete(ctx, vaultID, itemID)
+	})
+	if err != nil {
+		return err
+	}
+
+	if c.cache != nil {
+		c.cache.InvalidateItemOverviews(vaultID)
+	}
+
+	return nil
 }
-
-// func (c *ClientWrapper) GeneratePassword(ctx context.Context) (string, error) {
-
-// 	c.inner.Items().Create(ctx, onepassword.ItemCreateParams{
-// 		Title:    "Test",
-// 		Category: onepassword.ItemCategorySSHKey,
-// 		Fields: []onepassword.ItemField{
-// 			{
-// 				Title: "Password",
-// 				Value: "password",
-// 			},
-// 		},
-// 	})
-
-// 	return "", nil
-// }
