@@ -14,7 +14,7 @@ import (
 )
 
 const (
-			defaultProviderAddress = "registry.terraform.io/fwfurtado/onepassword"
+	defaultProviderAddress = "registry.terraform.io/fwfurtado/onepassword"
 )
 
 var version string = "dev"
@@ -39,9 +39,3 @@ func main() {
 		log.Fatalf("Error serving provider: %v", err)
 	}
 }
-
-
-
-
-
-

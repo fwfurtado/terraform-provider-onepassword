@@ -7,11 +7,11 @@ import (
 	"net"
 	"time"
 
-				"github.com/1password/onepassword-sdk-go"
+	"github.com/1password/onepassword-sdk-go"
 )
 
 const (
-			defaultRetryAttempts = 5
+	defaultRetryAttempts = 5
 	defaultRetryDelay    = 200 * time.Millisecond
 	defaultRetryMaxDelay = 5 * time.Second
 )
@@ -52,7 +52,7 @@ func isRetryableError(err error) bool {
 	}
 
 	var rateLimitErr *onepassword.RateLimitExceededError
-			if errors.As(err, &rateLimitErr) {
+	if errors.As(err, &rateLimitErr) {
 		return true
 	}
 
@@ -89,14 +89,4 @@ func sleepWithContext(ctx context.Context, wait time.Duration) error {
 		return nil
 	}
 
-
-
-
-
 }
-
-
-
-
-
-
