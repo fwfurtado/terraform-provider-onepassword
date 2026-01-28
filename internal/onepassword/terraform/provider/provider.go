@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"time"
 
+	"github.com/fwfurtado/onepassword-tf-provider/internal/onepassword/cache"
 	"github.com/fwfurtado/onepassword-tf-provider/internal/onepassword/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -33,6 +35,7 @@ type OnePasswordProviderData struct {
 	ServiceAccount        *OnePasswordProviderServiceAccountData        `tfsdk:"service_account"`
 	DesktopAppIntegration *OnePasswordProviderDesktopAppIntegrationData `tfsdk:"desktop_app_integration"`
 	DefaultTags           *OnePasswordProviderDefaultTagsData           `tfsdk:"default_tags"`
+	Cache                 *OnePasswordProviderCacheData                 `tfsdk:"cache"`
 }
 
 // OnePasswordProviderServiceAccountData holds service account auth settings.
@@ -53,6 +56,15 @@ type providerConfig struct {
 // OnePasswordProviderDefaultTagsData holds default item tags.
 type OnePasswordProviderDefaultTagsData struct {
 	Tags types.Map `tfsdk:"tags"`
+}
+
+// OnePasswordProviderCacheData holds provider cache settings.
+type OnePasswordProviderCacheData struct {
+	Enabled    types.Bool   `tfsdk:"enabled"`
+	Path       types.String `tfsdk:"path"`
+	TTLVaults  types.String `tfsdk:"ttl_vaults"`
+	TTLItems   types.String `tfsdk:"ttl_items"`
+	TTLSecrets types.String `tfsdk:"ttl_secrets"`
 }
 
 // New returns a configured provider instance.
@@ -87,6 +99,25 @@ func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaReque
 			"  }\n" +
 			"}\n" +
 			"```\n\n" +
+			"Example (cache):\n" +
+			"```hcl\n" +
+			"provider \"onepassword\" {\n" +
+			"  service_account {\n" +
+			"    token = var.op_service_account_token\n" +
+			"  }\n" +
+			"\n" +
+			"  cache {\n" +
+			"    enabled     = true\n" +
+			"    ttl_vaults  = \"30m\"\n" +
+			"    ttl_items   = \"10m\"\n" +
+			"    ttl_secrets = \"2m\"\n" +
+			"  }\n" +
+			"}\n" +
+			"```\n\n" +
+			"Cache notes:\n" +
+			"- Vault/item cache is plaintext; secret cache is encrypted.\n" +
+			"- Service account requires OP_CACHE_KEY when ttl_secrets > 0.\n" +
+			"- Desktop integration uses keyring first, then OP_CACHE_KEY.\n\n" +
 			"References:\n" +
 			"- https://developer.1password.com/docs/cli/\n" +
 			"- https://developer.1password.com/docs/service-accounts/\n" +
@@ -134,6 +165,33 @@ func (p *OnePasswordProvider) Schema(_ context.Context, _ tfprovides.SchemaReque
 					},
 				},
 			},
+			"cache": schema.SingleNestedBlock{
+				MarkdownDescription: "Optional cache settings to reduce API calls. " +
+					"Vault and item caches are stored in plaintext, while secrets are encrypted. " +
+					"Service account requires OP_CACHE_KEY for ttl_secrets; desktop integration uses keyring first, then OP_CACHE_KEY.",
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						MarkdownDescription: "Whether to enable the local cache.",
+						Optional:            true,
+					},
+					"path": schema.StringAttribute{
+						MarkdownDescription: "Cache file path. Defaults to the OS cache directory.",
+						Optional:            true,
+					},
+					"ttl_vaults": schema.StringAttribute{
+						MarkdownDescription: "TTL for vault title to ID mappings (duration, e.g. \"30m\").",
+						Optional:            true,
+					},
+					"ttl_items": schema.StringAttribute{
+						MarkdownDescription: "TTL for item list caches per vault (duration, e.g. \"10m\").",
+						Optional:            true,
+					},
+					"ttl_secrets": schema.StringAttribute{
+						MarkdownDescription: "TTL for resolved secret references (duration). Requires cache key.",
+						Optional:            true,
+					},
+				},
+			},
 		},
 	}
 }
@@ -165,6 +223,72 @@ func (p *OnePasswordProvider) Configure(ctx context.Context, req tfprovides.Conf
 
 	var onePasswordClient *client.ClientWrapper
 	var defaultTags []string
+	var cacheStore *cache.Cache
+
+	cacheEnabled := defaultCacheEnabled
+	cachePath := defaultCachePath()
+	ttlVaults := defaultCacheVaultTTL
+	ttlItems := defaultCacheItemTTL
+	ttlSecrets := defaultCacheSecretTTL
+
+	if data.Cache != nil {
+		if !data.Cache.Enabled.IsNull() && !data.Cache.Enabled.IsUnknown() {
+			cacheEnabled = data.Cache.Enabled.ValueBool()
+		}
+		if !data.Cache.Path.IsNull() && !data.Cache.Path.IsUnknown() {
+			cachePath = data.Cache.Path.ValueString()
+		}
+		if !data.Cache.TTLVaults.IsNull() && !data.Cache.TTLVaults.IsUnknown() {
+			parsed, err := time.ParseDuration(data.Cache.TTLVaults.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError("Invalid cache TTL", "cache.ttl_vaults must be a valid duration: "+err.Error())
+				return
+			}
+			ttlVaults = parsed
+		}
+		if !data.Cache.TTLItems.IsNull() && !data.Cache.TTLItems.IsUnknown() {
+			parsed, err := time.ParseDuration(data.Cache.TTLItems.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError("Invalid cache TTL", "cache.ttl_items must be a valid duration: "+err.Error())
+				return
+			}
+			ttlItems = parsed
+		}
+		if !data.Cache.TTLSecrets.IsNull() && !data.Cache.TTLSecrets.IsUnknown() {
+			parsed, err := time.ParseDuration(data.Cache.TTLSecrets.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError("Invalid cache TTL", "cache.ttl_secrets must be a valid duration: "+err.Error())
+				return
+			}
+			ttlSecrets = parsed
+		}
+	}
+
+	if cacheEnabled {
+		var cacheKey string
+		if ttlSecrets > 0 {
+			useKeyring := data.DesktopAppIntegration != nil
+			resolvedKey, err := resolveCacheKey(useKeyring)
+			if err != nil {
+				resp.Diagnostics.AddError("Missing cache encryption key", err.Error())
+				return
+			}
+			cacheKey = resolvedKey
+		}
+
+		encryptor, err := cache.NewEncryptor(cacheKey)
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to create cache encryptor", err.Error())
+			return
+		}
+
+		store, err := cache.NewFileCache(cachePath, ttlVaults, ttlItems, ttlSecrets, encryptor)
+		if err != nil {
+			resp.Diagnostics.AddWarning("Cache disabled", "Failed to initialize cache: "+err.Error())
+		} else {
+			cacheStore = store
+		}
+	}
 
 	if data.ServiceAccount != nil {
 		token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
@@ -183,7 +307,7 @@ func (p *OnePasswordProvider) Configure(ctx context.Context, req tfprovides.Conf
 			return
 		}
 
-		tempOnePasswordClient, err := client.NewServiceAccount(ctx, p.version, token)
+		tempOnePasswordClient, err := client.NewServiceAccount(ctx, p.version, token, cacheStore)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -214,7 +338,7 @@ func (p *OnePasswordProvider) Configure(ctx context.Context, req tfprovides.Conf
 			return
 		}
 
-		tempOnePasswordClient, err := client.NewDesktopAppIntegration(ctx, p.version, accountName)
+		tempOnePasswordClient, err := client.NewDesktopAppIntegration(ctx, p.version, accountName, cacheStore)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
