@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   format:
@@ -31,6 +32,10 @@ jobs:
         with:
           script: |
             if (context.eventName !== 'pull_request') {
+              return;
+            }
+
+            if (context.payload.pull_request?.head?.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
               return;
             }
 
@@ -148,7 +153,14 @@ jobs:
 
               return results;
             }
-
+      - name: Format check
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt required:"
+            echo "$unformatted"
+            exit 1
+          fi
   lint:
     runs-on: ubuntu-latest
     steps:
