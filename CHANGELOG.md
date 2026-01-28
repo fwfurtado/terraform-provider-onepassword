@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.2.0...v0.3.0) (2026-01-28)
+
+
+### Features
+
+* add simple cache implementation ([421fcfa](https://github.com/fwfurtado/terraform-provider-onepassword/commit/421fcfa8125bb20a556aea36ebd0c51d7d68be39))
+
+
+### Bug Fixes
+
+* formatting issues ([8da96c8](https://github.com/fwfurtado/terraform-provider-onepassword/commit/8da96c8c56a679643cb3bd4e63e0382a7a1e35a5))
+
 ## [0.2.0](https://github.com/fwfurtado/terraform-provider-onepassword/compare/v0.1.0...v0.2.0) (2026-01-27)
 
 
