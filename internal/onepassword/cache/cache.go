@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ const (
 
 	vaultKeyPrefix  = "vault:"
 	itemsKeyPrefix  = "items:"
+	itemKeyPrefix   = "item:"
 	secretKeyPrefix = "secret:"
 )
 
@@ -85,6 +87,21 @@ func (c *Cache) GetItemOverviews(vaultID string) ([]onepassword.ItemOverview, bo
 	return items, true
 }
 
+func (c *Cache) GetItemOverview(vaultID, title string) (*onepassword.ItemOverview, bool) {
+	data, ok := c.getBytes(itemKeyPrefix + vaultID + ":" + title)
+	if !ok {
+		return nil, false
+	}
+
+	var item onepassword.ItemOverview
+	if err := json.Unmarshal(data, &item); err != nil {
+		c.delete(itemKeyPrefix + vaultID + ":" + title)
+		return nil, false
+	}
+
+	return &item, true
+}
+
 func (c *Cache) SetItemOverviews(vaultID string, items []onepassword.ItemOverview) {
 	if c.ttlItems <= 0 {
 		return
@@ -94,10 +111,32 @@ func (c *Cache) SetItemOverviews(vaultID string, items []onepassword.ItemOvervie
 		return
 	}
 	c.setBytes(itemsKeyPrefix+vaultID, data, c.ttlItems, false)
+	for _, item := range items {
+		c.SetItemOverview(vaultID, item)
+	}
+}
+
+func (c *Cache) SetItemOverview(vaultID string, item onepassword.ItemOverview) {
+	if c.ttlItems <= 0 {
+		return
+	}
+	data, err := json.Marshal(item)
+	if err != nil {
+		return
+	}
+	c.setBytes(itemKeyPrefix+vaultID+":"+item.Title, data, c.ttlItems, false)
 }
 
 func (c *Cache) InvalidateItemOverviews(vaultID string) {
 	c.delete(itemsKeyPrefix + vaultID)
+	prefix := itemKeyPrefix + vaultID + ":"
+	c.entries.Range(func(key, value any) bool {
+		if keyName, ok := key.(string); ok && strings.HasPrefix(keyName, prefix) {
+			c.entries.Delete(keyName)
+		}
+		return true
+	})
+	_ = c.save()
 }
 
 func (c *Cache) GetSecret(reference string) (string, bool) {

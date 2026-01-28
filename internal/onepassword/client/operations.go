@@ -49,24 +49,29 @@ func (c *ClientWrapper) GetVault(ctx context.Context, title string) (string, err
 		return "", err
 	}
 
-	vault, found := lo.Find(vaults, func(vault onepassword.VaultOverview) bool {
-		return vault.Title == title
-	})
+	var vaultID string
+	for _, vault := range vaults {
+		if c.cache != nil {
+			c.cache.SetVaultID(vault.Title, vault.ID)
+		}
+		if vault.Title == title {
+			vaultID = vault.ID
+		}
+	}
 
-	if !found {
+	if vaultID == "" {
 		return "", fmt.Errorf("vault not found")
 	}
 
-	if c.cache != nil {
-		c.cache.SetVaultID(title, vault.ID)
-	}
-
-	return vault.ID, nil
+	return vaultID, nil
 }
 
 // GetItemOverview fetches an item overview by vault and item title.
 func (c *ClientWrapper) GetItemOverview(ctx context.Context, vaultID, name string) (*onepassword.ItemOverview, error) {
 	if c.cache != nil {
+		if cachedItem, ok := c.cache.GetItemOverview(vaultID, name); ok {
+			return cachedItem, nil
+		}
 		if cachedItems, ok := c.cache.GetItemOverviews(vaultID); ok {
 			item, found := lo.Find(cachedItems, func(item onepassword.ItemOverview) bool {
 				return item.Title == name
