@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
 
 permissions:
@@ -41,7 +39,10 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pull_number = context.issue.number;
-            const commit_id = context.sha;
+            const commit_id = context.payload.pull_request?.head?.sha;
+            if (!commit_id) {
+              return;
+            }
 
             const comments = parseDiff(diff, commit_id);
 
