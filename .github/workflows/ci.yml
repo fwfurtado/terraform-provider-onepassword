@@ -31,10 +31,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            if (context.eventName !== 'pull_request') {
-              return;
-            }
-
             if (context.payload.pull_request?.head?.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
               return;
             }

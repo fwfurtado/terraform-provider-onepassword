@@ -1,0 +1,14 @@
+{
+  "name": "gofmt-review-test",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local harness to parse gofmt diff and build GitHub review comment payloads.",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@octokit/core": "^7.0.0",
+    "undici": "^7.15.0"
+  }
+}
