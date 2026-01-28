@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  checks: write
 
 jobs:
   format:
@@ -44,18 +45,28 @@ jobs:
               return;
             }
 
-            const comments = parseDiff(diff, commit_id);
+            const annotations = parseDiff(diff);
+            if (annotations.length === 0) return;
 
-            for (const comment of comments) {
-              await github.rest.pulls.createReviewComment({
+            const MAX_ANNOTATIONS = 50;
+            for (let i = 0; i < annotations.length; i += MAX_ANNOTATIONS) {
+              const chunk = annotations.slice(i, i + MAX_ANNOTATIONS);
+              await github.rest.checks.create({
                 owner,
                 repo,
-                pull_number,
-                ...comment,
+                name: 'gofmt',
+                head_sha: commit_id,
+                status: 'completed',
+                conclusion: 'failure',
+                output: {
+                  title: 'gofmt required',
+                  summary: 'gofmt reported formatting differences.',
+                  annotations: chunk,
+                },
               });
             }
 
-            function parseDiff(diffText, commitId) {
+            function parseDiff(diffText) {
               let filePath = null;
               let oldLine = 0;
               let newLine = 0;
@@ -73,25 +84,16 @@ jobs:
                   return;
                 }
 
-                const leftLine = firstRemovedLine ?? hunkOldStart;
-                if (removedLines.length > 0 && leftLine !== null) {
+                const anchorLine = firstAddedLine ?? hunkNewStart;
+                if (anchorLine !== null) {
+                  const messageLines = [...removedLines, ...addedLines];
+                  const addedCount = addedLines.length || 1;
                   results.push({
-                    commit_id: commitId,
                     path: filePath,
-                    line: leftLine,
-                    side: 'LEFT',
-                    body: `gofmt:\n${removedLines.join('\n')}`,
-                  });
-                }
-
-                const rightLine = firstAddedLine ?? hunkNewStart;
-                if (addedLines.length > 0 && rightLine !== null) {
-                  results.push({
-                    commit_id: commitId,
-                    path: filePath,
-                    line: rightLine,
-                    side: 'RIGHT',
-                    body: `gofmt:\n${addedLines.join('\n')}`,
+                    start_line: anchorLine,
+                    end_line: anchorLine + addedCount - 1,
+                    annotation_level: 'failure',
+                    message: `gofmt:\n${messageLines.join('\n')}`,
                   });
                 }
 
