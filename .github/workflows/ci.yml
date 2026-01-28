@@ -9,6 +9,164 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Gofmt diff (all files)
+        run: |
+          gofmt -d . > /tmp/gofmt.diff
+          echo "GOFMT_DIFF<<EOF" >> $GITHUB_ENV
+          cat /tmp/gofmt.diff >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Comment gofmt diff (all files)
+        uses: actions/github-script@v6
+        with:
+          script: |
+            if (context.eventName !== 'pull_request') {
+              return;
+            }
+
+            const diff = process.env.GOFMT_DIFF || '';
+            if (!diff.trim()) return;
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.issue.number;
+            const commit_id = context.sha;
+
+            const comments = parseDiff(diff, commit_id);
+
+            for (const comment of comments) {
+              await github.rest.pulls.createReviewComment({
+                owner,
+                repo,
+                pull_number,
+                ...comment,
+              });
+            }
+
+            function parseDiff(diffText, commitId) {
+              let filePath = null;
+              let oldLine = 0;
+              let newLine = 0;
+              let hunkActive = false;
+              let removedLines = [];
+              let addedLines = [];
+              let hunkOldStart = null;
+              let hunkNewStart = null;
+              const results = [];
+
+              const flushHunk = () => {
+                if (!filePath || !hunkActive) {
+                  return;
+                }
+
+                if (removedLines.length > 0 && hunkOldStart !== null) {
+                  results.push({
+                    commit_id: commitId,
+                    path: filePath,
+                    line: hunkOldStart,
+                    side: 'LEFT',
+                    body: `gofmt:\n${removedLines.join('\n')}`,
+                  });
+                }
+
+                if (addedLines.length > 0 && hunkNewStart !== null) {
+                  results.push({
+                    commit_id: commitId,
+                    path: filePath,
+                    line: hunkNewStart,
+                    side: 'RIGHT',
+                    body: `gofmt:\n${addedLines.join('\n')}`,
+                  });
+                }
+
+                removedLines = [];
+                addedLines = [];
+                hunkOldStart = null;
+                hunkNewStart = null;
+                hunkActive = false;
+              };
+
+              for (const line of diffText.split('\n')) {
+                if (line.startsWith('diff ')) {
+                  flushHunk();
+                  filePath = null;
+                  oldLine = 0;
+                  newLine = 0;
+                  continue;
+                }
+
+                if (line.startsWith('+++ ')) {
+                  filePath = line.replace('+++ ', '').trim();
+                  if (filePath.startsWith('a/') || filePath.startsWith('b/')) {
+                    filePath = filePath.slice(2);
+                  }
+                  continue;
+                }
+
+                const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+                if (hunk) {
+                  flushHunk();
+                  oldLine = parseInt(hunk[1], 10);
+                  newLine = parseInt(hunk[2], 10);
+                  hunkOldStart = oldLine;
+                  hunkNewStart = newLine;
+                  hunkActive = true;
+                  continue;
+                }
+
+                if (!filePath || line.startsWith('--- ')) continue;
+
+                if (line.startsWith('+') && !line.startsWith('+++')) {
+                  addedLines.push(line);
+                  newLine++;
+                  continue;
+                }
+
+                if (line.startsWith('-') && !line.startsWith('---')) {
+                  removedLines.push(line);
+                  oldLine++;
+                  continue;
+                }
+
+                if (line.startsWith(' ')) {
+                  oldLine++;
+                  newLine++;
+                }
+              }
+
+              flushHunk();
+
+              return results;
+            }
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.8.0
+          args: ./...
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -29,12 +187,6 @@ jobs:
             echo "$unformatted"
             exit 1
           fi
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.8.0
-          args: ./...
 
       - name: Test
         run: go test ./...

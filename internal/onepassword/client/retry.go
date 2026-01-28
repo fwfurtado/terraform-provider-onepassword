@@ -7,18 +7,16 @@ import (
 	"net"
 	"time"
 
-	"github.com/1password/onepassword-sdk-go"
+				"github.com/1password/onepassword-sdk-go"
 )
 
 const (
-	defaultRetryAttempts = 5
+			defaultRetryAttempts = 5
 	defaultRetryDelay    = 200 * time.Millisecond
 	defaultRetryMaxDelay = 5 * time.Second
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
+var retryRng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func withRetry[T any](ctx context.Context, fn func(context.Context) (T, error)) (T, error) {
 	var zero T
@@ -54,13 +52,13 @@ func isRetryableError(err error) bool {
 	}
 
 	var rateLimitErr *onepassword.RateLimitExceededError
-	if errors.As(err, &rateLimitErr) {
+			if errors.As(err, &rateLimitErr) {
 		return true
 	}
 
 	var netErr net.Error
 	if errors.As(err, &netErr) {
-		return netErr.Timeout() || netErr.Temporary()
+		return netErr.Timeout()
 	}
 
 	return false
@@ -76,7 +74,7 @@ func addJitter(base time.Duration) time.Duration {
 		return base
 	}
 
-	jitter := time.Duration(rand.Int63n(int64(maxJitter)))
+	jitter := time.Duration(retryRng.Int63n(int64(maxJitter)))
 	return base + jitter
 }
 
@@ -90,4 +88,15 @@ func sleepWithContext(ctx context.Context, wait time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+
+
+
+
+
 }
+
+
+
+
+
+
