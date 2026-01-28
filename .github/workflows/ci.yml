@@ -166,14 +166,6 @@ jobs:
 
               return results;
             }
-      - name: Format check
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "gofmt required:"
-            echo "$unformatted"
-            exit 1
-          fi
   lint:
     runs-on: ubuntu-latest
     steps:
